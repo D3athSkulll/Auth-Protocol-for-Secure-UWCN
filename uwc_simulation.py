@@ -1,57 +1,61 @@
 """
-PEECC / UWC Base Implementation
---------------------------------
+PEECC / UWC Authentication + Evaluation Simulation
+===================================================
 
-Baseline implementation of the architecture proposed in:
+Single-file runner built from the clean PEECC/UWCN architecture (Code 1)
+with the evaluation, plots, and measurements used by the earlier improved
+simulation (Code 2).
 
-C. Rupa et al., "A Novel and Robust Authentication Protocol for
-Secure Underwater Communication Systems," IEEE Internet of Things
-Journal, vol. 12, no. 22, pp. 47519-47531, 2025.
+PROTOCOL SOURCE OF TRUTH
+------------------------
+The security/protocol core follows the supplied Scyther model:
 
-This is the FIRST / BASE COMMIT.
+    UWS <-> SUB <-> BUOY <-> SAT <-> BS
 
-Implemented from the paper:
-  1. System initialization
-  2. Registration
-  3. Hop-wise mutual authentication
-  4. UWS -> SUB -> BUOY -> SAT -> BS data flow
-  5. Messages M1-M12
-  6. Nonce + timestamp checks
-  7. Registration identifier RID and verification value theta
-  8. Alternate peers for the paper's fallback architecture
+Each hop is an independent 3-message NSL-style exchange:
 
-Intentionally NOT included in this base commit:
-  - AES-GCM
-  - Thorp acoustic absorption
-  - packet-loss / retransmission model
-  - battery accounting
-  - node mobility model
+    M1/M2/M3  = UWS  <-> SUB
+    M4/M5/M6  = SUB  <-> BUOY
+    M7/M8/M9  = BUOY <-> SAT
+    M10/M11/M12 = SAT <-> BS
+
+Within each hop:
+    a) initiator -> responder: {tag_a, initiator_ID, fresh_nonce}pk(responder)
+    b) responder -> initiator: {tag_b, nonce_i, fresh_nonce_r, responder_ID}pk(initiator)
+    c) initiator -> responder: {tag_c, nonce_r}pk(responder)
+
+IMPORTANT
+---------
+This file is intentionally kept as a runnable protocol/evaluation model,
+not a production cryptographic implementation. The paper gives a PEECC
+5-dimensional representation but does not provide a complete executable
+5-D group law and public-key-encryption construction. The PEECC backend here
+is therefore an isolated symbolic/simulation abstraction. Do not interpret
+its XOR envelope as deployable security.
+
+The added Code-2-style features are evaluation models around the protocol:
+  - AES-GCM timing benchmark (does NOT replace protocol crypto)
+  - Thorp-based acoustic delay model
+  - packet loss + retransmission model
+  - per-node energy/battery accounting
+  - UWS/SUB mobility
   - delay anomaly detection
-  - prior-scheme comparison plots
-  - throughput/scaling experiments
-  - forced node failures
-  - standard secp256r1 ECC
+  - scaling experiment
+  - comparison plots
+  - throughput estimate
+  - seven PNG output graphs
 
-IMPORTANT CRYPTOGRAPHIC NOTE
-----------------------------
-The paper specifies the pentatope representation and the protocol notation,
-but does not provide a complete, executable 5-D group law or a complete
-public-key encryption construction. Therefore the PEECCBackend below is an
-explicit *protocol simulation abstraction*:
+Run:
+    python uwc_simulation.py
 
-    public = private * generator
-    shared  = private_A * public_B = private_B * public_A
-
-The multiplication is represented coordinate-wise modulo p. This lets the
-protocol implementation follow the paper's data flow without silently
-substituting secp256r1 or claiming that this is a production PEECC library.
-
-The message envelope uses a deterministic XOR stream derived from the shared
-PEECC point. This mirrors the lightweight "encrypt/decrypt" abstraction used
-by the original simulation while keeping the cryptographic layer isolated so
-a real PEECC implementation can replace it in a later commit.
-
-No claim is made that this XOR construction is secure for deployment.
+Outputs:
+    output_topology.png
+    output_delay.png
+    output_energy.png
+    output_comm_cost.png
+    output_comparison.png
+    output_throughput.png
+    output_battery.png
 """
 
 from __future__ import annotations
@@ -59,46 +63,98 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import hashlib
 import os
+import random
+import statistics
 import time
 from typing import Dict, List, Optional, Tuple
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import networkx as nx
 
-# ---------------------------------------------------------------------------
-# Global protocol parameters
-# ---------------------------------------------------------------------------
+try:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+except ImportError:
+    AESGCM = None
+
+
+# ============================================================================
+# Configuration
+# ============================================================================
 
 HASH_NAME = "sha256"
-
-# A large prime used for the software model.
-# It is a simulation parameter, not a curve parameter copied from the paper.
 P = 2**255 - 19
-
-# The paper uses a pentatope curve:
-#
-#   psi = X^3 + Y^3 + Z^3 + W^3 + T^3 = dXYZWT
-#
-# We retain d as an explicit system parameter.
 D = 2
-
-# The paper uses a generator point rho = (Xrho, Yrho, Zrho, Wrho, Trho)
-# with a large prime order n.
 GENERATOR = (5, 7, 11, 13, 17)
+TSW = 5.0
 
-# Timestamp tolerance.
-#
-# The paper discusses an adaptive timestamp window, but does not specify a
-# concrete update equation.  The base implementation therefore uses a fixed
-# simulation value and keeps the timestamp logic local to each hop.
-DELTA_T = 5.0
+# Code 2 evaluation settings.
+SOUND_MPS = 1500.0
+ACOUSTIC_FREQ_KHZ = 25.0
+LOSS_RATE = 0.15
+MAX_RETRY = 3
+BAT_uJ = 3_300_000.0
+AUTH_uJ = 48.8
+TX_uJ = 50.0
+RX_uJ = 36.0
+SCALE_SIZES = [10, 20, 50, 100, 150, 200]
+ANOMALY_THRESHOLD = 2.5
+
+# Physical distances retained from Code 2, as an evaluation parameter.
+DISTS = {
+    ("U1", "S1"): 150,
+    ("U2", "S1"): 200,
+    ("S1", "B1"): 800,
+    ("S1", "B2"): 850,
+    ("B1", "SAT1"): 1000,
+    ("B2", "SAT2"): 1000,
+    ("SAT1", "BS"): 500,
+    ("SAT2", "BS"): 500,
+}
+
+NODES = {
+    "UWS": ["U1", "U2"],
+    "SUB": ["S1"],
+    "BUOY": ["B1", "B2"],
+    "SAT": ["SAT1", "SAT2"],
+    "BS": ["BS"],
+}
+
+EDGES = [
+    ("U1", "S1"), ("U2", "S1"),
+    ("S1", "B1"), ("S1", "B2"),
+    ("B1", "SAT1"), ("B1", "SAT2"),
+    ("B2", "SAT1"), ("B2", "SAT2"),
+    ("SAT1", "BS"), ("SAT2", "BS"),
+]
+
+TAGS = {
+    1: ("h1a", "h1b", "h1c"),
+    2: ("h2a", "h2b", "h2c"),
+    3: ("h3a", "h3b", "h3c"),
+    4: ("h4a", "h4b", "h4c"),
+}
+
+# Prior Code-2 comparison numbers retained for reproducibility.
+# They should be independently checked against the paper before academic use.
+COMPARISON = {
+    "Ref [21]": {"comm": 3008, "uws": 0.536, "sub": 0.800},
+    "Ref [22]": {"comm": 3200, "uws": 19.70, "sub": 25.00},
+    "Ref [23]": {"comm": 3136, "uws": 75.88, "sub": 90.00},
+    "Ref [24]": {"comm": 3040, "uws": 2.352, "sub": 2.900},
+    "Ref [25]": {"comm": 3216, "uws": 1.245, "sub": 1.600},
+    "Proposed": {"comm": 2112, "uws": 0.400, "sub": 0.500},
+}
 
 
-# ---------------------------------------------------------------------------
+# ============================================================================
 # Utility functions
-# ---------------------------------------------------------------------------
+# ============================================================================
 
 def h(*parts: object) -> str:
-    """SHA-256 over a deterministic textual concatenation."""
-    material = "|".join(str(part) for part in parts).encode("utf-8")
+    material = "|".join(str(x) for x in parts).encode("utf-8")
     return hashlib.sha256(material).hexdigest()
 
 
@@ -114,33 +170,29 @@ def new_nonce() -> int:
     return int.from_bytes(os.urandom(8), "big")
 
 
-# ---------------------------------------------------------------------------
-# PEECC abstraction
-# ---------------------------------------------------------------------------
+def xor_stream(data: bytes, key: bytes) -> bytes:
+    if not key:
+        raise ValueError("key must not be empty")
+    return bytes(b ^ key[i % len(key)] for i, b in enumerate(data))
+
+
+# ============================================================================
+# PEECC simulation backend -- same architecture as Code 1
+# ============================================================================
 
 @dataclass(frozen=True)
 class PEECCPoint:
-    """
-    Five-dimensional point representation used by the protocol model.
-
-    The paper defines a 5-D pentatope point group, but does not give a
-    complete implementable group operation.  Scalar multiplication is
-    therefore represented coordinate-wise modulo P in this baseline.
-    """
-
     coords: Tuple[int, int, int, int, int]
 
     def __post_init__(self) -> None:
         if len(self.coords) != 5:
-            raise ValueError("PEECC points must have exactly 5 coordinates")
+            raise ValueError("PEECC point must contain five coordinates")
 
     def scalar_mul(self, k: int) -> "PEECCPoint":
         return PEECCPoint(tuple((k * x) % P for x in self.coords))
 
 
 class PEECCBackend:
-    """Small isolated cryptographic backend for the protocol simulation."""
-
     def __init__(self, prime: int = P, d: int = D) -> None:
         self.p = prime
         self.d = d
@@ -148,57 +200,24 @@ class PEECCBackend:
 
     def generate_keypair(self) -> Tuple[int, PEECCPoint]:
         private = random_scalar()
-        public = self.generator.scalar_mul(private)
-        return private, public
+        return private, self.generator.scalar_mul(private)
 
     def shared_point(self, private: int, peer_public: PEECCPoint) -> PEECCPoint:
         return peer_public.scalar_mul(private)
 
-    def derive_key(self, shared_point: PEECCPoint) -> bytes:
-        return hashlib.sha256(
-            canonical_point(shared_point).encode("utf-8")
-        ).digest()
+    def derive_key(self, point: PEECCPoint) -> bytes:
+        return hashlib.sha256(canonical_point(point).encode()).digest()
 
-    def encrypt(
-        self,
-        sender_private: int,
-        receiver_public: PEECCPoint,
-        plaintext: str,
-    ) -> bytes:
-        """
-        Reference envelope:
+    def encrypt(self, sender_private: int, receiver_public: PEECCPoint,
+                plaintext: str) -> bytes:
+        point = self.shared_point(sender_private, receiver_public)
+        return xor_stream(plaintext.encode(), self.derive_key(point))
 
-            K = H(PK_sender * PU_receiver)
-            C = plaintext XOR K-stream
+    def decrypt(self, receiver_private: int, sender_public: PEECCPoint,
+                ciphertext: bytes) -> str:
+        point = self.shared_point(receiver_private, sender_public)
+        return xor_stream(ciphertext, self.derive_key(point)).decode()
 
-        Receiver reconstructs the same point using its private key and the
-        sender's public key.
-        """
-        shared = self.shared_point(sender_private, receiver_public)
-        key = self.derive_key(shared)
-        data = plaintext.encode("utf-8")
-        return xor_stream(data, key)
-
-    def decrypt(
-        self,
-        receiver_private: int,
-        sender_public: PEECCPoint,
-        ciphertext: bytes,
-    ) -> str:
-        shared = self.shared_point(receiver_private, sender_public)
-        key = self.derive_key(shared)
-        data = xor_stream(ciphertext, key)
-        return data.decode("utf-8")
-
-
-def xor_stream(data: bytes, key: bytes) -> bytes:
-    """Repeat the derived key as a simple simulation stream."""
-    return bytes(b ^ key[i % len(key)] for i, b in enumerate(data))
-
-
-# ---------------------------------------------------------------------------
-# Entity model
-# ---------------------------------------------------------------------------
 
 @dataclass
 class Entity:
@@ -207,796 +226,607 @@ class Entity:
     private_key: int
     public_key: PEECCPoint
     identifier: str
-
-    # Registered peers known to this entity.
+    peers: List[str] = field(default_factory=list)
     registered: Dict[str, str] = field(default_factory=dict)
 
-    # The paper describes local trusted peer caches for fallback operation.
-    peers: List[str] = field(default_factory=list)
 
+# ============================================================================
+# Protocol + simulation
+# ============================================================================
 
-# ---------------------------------------------------------------------------
-# System initialization
-# ---------------------------------------------------------------------------
-
-class UWCNProtocol:
-    """
-    Implements the paper's five logical entity classes:
-
-        UWS -> SUB -> B -> SAT -> BS
-
-    The concrete simulation contains two UWS nodes, one SUB, two buoys,
-    two satellites, and one base station.
-    """
-
+class UWCSimulation:
     def __init__(self) -> None:
         self.crypto = PEECCBackend()
-
-        self.roles = {
-            "UWS": ["U1", "U2"],
-            "SUB": ["S1"],
-            "BUOY": ["B1", "B2"],
-            "SAT": ["SAT1", "SAT2"],
-            "BS": ["BS"],
-        }
-
         self.entities: Dict[str, Entity] = {}
         self.registration_set: set[str] = set()
         self.sessions: Dict[Tuple[str, str], str] = {}
 
+        # Code-2-style evaluation state.
+        self.battery = {name: BAT_uJ for names in NODES.values() for name in names}
+        self.mobility = {name: 0.0 for names in NODES.values() for name in names}
+        self.delay_log: List[float] = []
+        self.hop_delay_log: List[Tuple[int, str, str, float]] = []
+        self.packet_stats = {"attempts": 0, "lost": 0, "retries": 0,
+                             "delivered": 0, "failed": 0}
+        self.message_records: List[Dict[str, object]] = []
+        self.round_results: List[bool] = []
+        self.clean_result: Optional[bool] = None
+        self.data_payload: Dict[str, object] = {}
+
         self._initialize_system()
 
-    def _initialize_system(self) -> None:
-        print("\n=== SYSTEM INITIALIZATION ===")
+    # ---------------------------------------------------------------------
+    # Initialization / registration
+    # ---------------------------------------------------------------------
 
-        for role, names in self.roles.items():
+    def _initialize_system(self) -> None:
+        print("\n=== SYSTEM INITIALISATION ===")
+        for role, names in NODES.items():
             for name in names:
                 private, public = self.crypto.generate_keypair()
-
-                # Paper: ID_i = H(PU_i || E)
                 identifier = h(canonical_point(public), name)
+                self.entities[name] = Entity(name, role, private, public, identifier)
 
-                self.entities[name] = Entity(
-                    name=name,
-                    role=role,
-                    private_key=private,
-                    public_key=public,
-                identifier=identifier,
-                )
+        peers = {
+            "U1": ["S1"], "U2": ["S1"],
+            "S1": ["U1", "U2", "B1", "B2"],
+            "B1": ["S1", "SAT1", "SAT2"],
+            "B2": ["S1", "SAT1", "SAT2"],
+            "SAT1": ["B1", "B2", "BS"],
+            "SAT2": ["B1", "B2", "BS"],
+            "BS": ["SAT1", "SAT2"],
+        }
+        for name, plist in peers.items():
+            self.entities[name].peers = plist
 
-        # Logical neighbor/cache structure from the hierarchical topology.
-        self._set_peers("U1", ["S1"])
-        self._set_peers("U2", ["S1"])
+        for e in self.entities.values():
+            print(f"{e.name:5s} role={e.role:5s} ID={e.identifier[:20]}...")
 
-        self._set_peers("S1", ["U1", "U2", "B1", "B2"])
-
-        self._set_peers("B1", ["S1", "SAT1", "SAT2"])
-        self._set_peers("B2", ["S1", "SAT1", "SAT2"])
-
-        self._set_peers("SAT1", ["B1", "B2", "BS"])
-        self._set_peers("SAT2", ["B1", "B2", "BS"])
-
-        self._set_peers("BS", ["SAT1", "SAT2"])
-
-        for entity in self.entities.values():
-            print(
-                f"{entity.name:5s}  role={entity.role:5s}  "
-                f"ID={entity.identifier[:20]}..."
-            )
-
-    def _set_peers(self, entity_name: str, peers: List[str]) -> None:
-        self.entities[entity_name].peers = list(peers)
-
-    # -----------------------------------------------------------------------
-    # Registration phase
-    # -----------------------------------------------------------------------
-
-    def register_entity(self, entity_name: str) -> str:
-        """
-        Create the registration material for one entity.
-
-            RID_i   = H(ID_i || PU_i || PK_i)
-            theta_i = H(RID_i || PU_i)
-
-        The paper maintains a registered-ID set R.  An entity is therefore
-        inserted once in R, while the resulting registration material is
-        shared with each communicating peer.
-        """
-        entity = self.entities[entity_name]
-
-        rid = h(
-            entity.identifier,
-            canonical_point(entity.public_key),
-            entity.private_key,
-        )
-        theta = h(rid, canonical_point(entity.public_key))
-
-        # Keep the registration value local for later distribution.
-        entity.registered["_RID"] = rid
-        entity.registered["_THETA"] = theta
-
-        if rid not in self.registration_set:
-            self.registration_set.add(rid)
-            print(
-                f"[REGISTERED] {entity_name:5s}  "
-                f"RID={rid[:16]}..."
-            )
-
-        return rid
-
-    def register_link(self, entity_name: str, peer_name: str) -> bool:
-        """
-        Distribute an entity's {RID, PU, theta} to one peer and validate theta.
-        """
-        entity = self.entities[entity_name]
-        peer = self.entities[peer_name]
-
-        rid = entity.registered.get("_RID")
-        theta = entity.registered.get("_THETA")
-
-        if rid is None or theta is None:
-            rid = self.register_entity(entity_name)
-            theta = entity.registered["_THETA"]
-
-        theta_check = h(rid, canonical_point(entity.public_key))
-
-        if theta_check != theta:
-            print(
-                f"[REG FAIL] {entity_name} -> {peer_name}: "
-                "invalid theta"
-            )
-            return False
-
-        peer.registered[entity_name] = rid
-
-        session_id = h(
-            "REG-SESSION",
-            entity_name,
-            peer_name,
-            rid,
-        )
-        self.sessions[(entity_name, peer_name)] = session_id
-        self.sessions[(peer_name, entity_name)] = session_id
-
-        return True
+    def register_entity(self, name: str) -> None:
+        e = self.entities[name]
+        rid = h(e.identifier, canonical_point(e.public_key), e.private_key)
+        theta = h(rid, canonical_point(e.public_key))
+        e.registered["RID"] = rid
+        e.registered["THETA"] = theta
+        self.registration_set.add(rid)
+        print(f"[REGISTERED] {name:5s} RID={rid[:16]}...")
 
     def register_network(self) -> None:
         print("\n=== REGISTRATION PHASE ===")
-
-        # First create one RID for every entity.
         for name in self.entities:
             self.register_entity(name)
 
-        # Then distribute registration data to immediate communication peers.
         direct_links = [
-            ("U1", "S1"),
-            ("U2", "S1"),
-            ("S1", "B1"),
-            ("S1", "B2"),
-            ("B1", "SAT1"),
-            ("B1", "SAT2"),
-            ("B2", "SAT1"),
-            ("B2", "SAT2"),
-            ("SAT1", "BS"),
-            ("SAT2", "BS"),
+            ("U1", "S1"), ("U2", "S1"),
+            ("S1", "B1"), ("S1", "B2"),
+            ("B1", "SAT1"), ("B1", "SAT2"),
+            ("B2", "SAT1"), ("B2", "SAT2"),
+            ("SAT1", "BS"), ("SAT2", "BS"),
         ]
-
         for a, b in direct_links:
-            self.register_link(a, b)
+            self._register_link(a, b)
+        print(f"Registration set R: {len(self.registration_set)} unique RIDs")
 
-        print(
-            f"Registration set R contains "
-            f"{len(self.registration_set)} unique entity RIDs."
-        )
+    def _register_link(self, a: str, b: str) -> bool:
+        ea, eb = self.entities[a], self.entities[b]
+        theta = h(ea.registered["RID"], canonical_point(ea.public_key))
+        if theta != ea.registered["THETA"]:
+            return False
+        eb.registered[a] = ea.registered["RID"]
+        eb.registered[a + ":THETA"] = theta
+        return True
 
-    # -----------------------------------------------------------------------
-    # Message helpers
-    # -----------------------------------------------------------------------
+    # ---------------------------------------------------------------------
+    # Code-2 acoustic / mobility / energy models
+    # ---------------------------------------------------------------------
 
-    def _encrypt(
-        self,
-        sender: str,
-        receiver: str,
-        fields: List[str],
-    ) -> bytes:
-        plaintext = "|".join(fields)
+    @staticmethod
+    def thorp_db_per_km(freq_khz: float) -> float:
+        f2 = freq_khz ** 2
+        return (0.11 * f2 / (1 + f2)
+                + 44 * f2 / (4100 + f2)
+                + 2.75e-4 * f2 + 0.003)
+
+    def update_mobility(self) -> None:
+        for node in ("U1", "U2", "S1"):
+            self.mobility[node] += random.uniform(-10.0, 10.0)
+            self.mobility[node] = max(-50.0, min(50.0, self.mobility[node]))
+
+    def acoustic_delay(self, sender: str, receiver: str) -> float:
+        key = (sender, receiver) if (sender, receiver) in DISTS else (receiver, sender)
+        distance = DISTS.get(key, 500) + abs(self.mobility.get(sender, 0.0))
+        distance = max(10.0, distance)
+        propagation = distance / SOUND_MPS
+        absorption = self.thorp_db_per_km(ACOUSTIC_FREQ_KHZ) * (distance / 1000) * 1e-4
+        multipath = abs(random.gauss(0, 0.005))
+        return propagation + absorption + multipath
+
+    def use_energy(self, node: str, operation: str) -> None:
+        amount = {"auth": AUTH_uJ, "tx": TX_uJ, "rx": RX_uJ}[operation]
+        self.battery[node] -= amount
+
+    # ---------------------------------------------------------------------
+    # Message primitives
+    # ---------------------------------------------------------------------
+
+    def _encrypt_fields(self, sender: str, receiver: str, fields: List[str]) -> bytes:
         return self.crypto.encrypt(
-            sender_private=self.entities[sender].private_key,
-            receiver_public=self.entities[receiver].public_key,
-            plaintext=plaintext,
+            self.entities[sender].private_key,
+            self.entities[receiver].public_key,
+            "|".join(fields),
         )
 
-    def _decrypt(
-        self,
-        sender: str,
-        receiver: str,
-        ciphertext: bytes,
-    ) -> List[str]:
+    def _decrypt_fields(self, sender: str, receiver: str, ciphertext: bytes) -> List[str]:
         plaintext = self.crypto.decrypt(
-            receiver_private=self.entities[receiver].private_key,
-            sender_public=self.entities[sender].public_key,
-            ciphertext=ciphertext,
+            self.entities[receiver].private_key,
+            self.entities[sender].public_key,
+            ciphertext,
         )
         return plaintext.split("|")
 
-    def _fresh_timestamp(self) -> float:
-        return time.time()
-
-    @staticmethod
-    def _within_window(t1: float, t2: float) -> bool:
-        return abs(t2 - t1) < DELTA_T
-
-    def _session(self, a: str, b: str) -> str:
-        return h("SESSION", a, b, new_nonce())
-
-    # -----------------------------------------------------------------------
-    # Generic hop authentication
-    # -----------------------------------------------------------------------
-
-    def authenticate_pair(
-        self,
-        initiator: str,
-        responder: str,
-        nonce: Optional[int] = None,
-    ) -> Tuple[bool, int]:
-        """
-        Implements the two-message handshake pattern appearing in each hop:
-
-          1. initiator -> responder:
-             ID_initiator, Nonce, TS
-          2. responder -> initiator:
-             ID_responder, Nonce, TS
-
-        Returns:
-            (success, nonce)
-        """
-        nonce = new_nonce() if nonce is None else nonce
-        ts1 = self._fresh_timestamp()
-
-        # M(request)
-        request = self._encrypt(
-            initiator,
-            responder,
-            [
-                self.entities[initiator].identifier,
-                str(nonce),
-                f"{ts1:.9f}",
-            ],
-        )
-
-        decoded = self._decrypt(initiator, responder, request)
-
-        received_id = decoded[0]
-        received_nonce = int(decoded[1])
-        received_ts = float(decoded[2])
-
-        if received_id != self.entities[initiator].identifier:
-            print(
-                f"[AUTH FAIL] {initiator}->{responder}: "
-                "identity mismatch"
-            )
-            return False, nonce
-
-        if received_nonce != nonce:
-            print(
-                f"[AUTH FAIL] {initiator}->{responder}: "
-                "nonce mismatch"
-            )
-            return False, nonce
-
-        # M(ack)
-        ts2 = self._fresh_timestamp()
-        acknowledgement = self._encrypt(
-            responder,
-            initiator,
-            [
-                self.entities[responder].identifier,
-                str(nonce),
-                f"{ts2:.9f}",
-            ],
-        )
-
-        decoded_ack = self._decrypt(responder, initiator, acknowledgement)
-
-        ack_id = decoded_ack[0]
-        ack_nonce = int(decoded_ack[1])
-        ack_ts = float(decoded_ack[2])
-
-        if ack_id != self.entities[responder].identifier:
-            print(
-                f"[AUTH FAIL] {responder}->{initiator}: "
-                "identity mismatch"
-            )
-            return False, nonce
-
-        if ack_nonce != nonce:
-            print(
-                f"[AUTH FAIL] {responder}->{initiator}: "
-                "nonce mismatch"
-            )
-            return False, nonce
-
-        if not self._within_window(received_ts, ack_ts):
-            print(
-                f"[AUTH FAIL] {responder}<->{initiator}: "
-                "timestamp window exceeded"
-            )
-            return False, nonce
-
-        session_id = self._session(initiator, responder)
-        self.sessions[(initiator, responder)] = session_id
-        self.sessions[(responder, initiator)] = session_id
-
-        print(
-            f"[AUTH OK] {initiator} <-> {responder}  "
-            f"nonce={nonce}  session={session_id[:16]}..."
-        )
-        return True, nonce
-
-    # -----------------------------------------------------------------------
-    # Protocol M1-M12
-    # -----------------------------------------------------------------------
-
-    def run_protocol(
-        self,
-        uws: str = "U1",
-        sub: str = "S1",
-        buoy: str = "B1",
-        satellite: str = "SAT1",
-    ) -> bool:
-        """
-        Full protocol sequence from the paper.
-
-        M1-M3   : UWS <-> SUB and environmental data
-        M4-M6   : SUB <-> B and aggregated environment/alerts
-        M7-M9   : B <-> SAT and ENV/GPS
-        M10-M12 : SAT <-> BS and ENV/ALERTS/GPS/LOGS
-        """
-        print("\n=== MUTUAL AUTHENTICATION / DATA PHASE ===")
-        print(
-            f"Path: {uws} -> {sub} -> {buoy} -> "
-            f"{satellite} -> BS"
-        )
-
-        # ------------------------------
-        # M1: UWS -> SUB
-        # ------------------------------
-        nonce_uws = new_nonce()
-        ts1 = self._fresh_timestamp()
-
-        m1 = self._encrypt(
-            uws,
-            sub,
-            [
-                self.entities[uws].identifier,
-                str(nonce_uws),
-                f"{ts1:.9f}",
-            ],
-        )
-        d1 = self._decrypt(uws, sub, m1)
-
-        if d1[0] != self.entities[uws].identifier:
-            return self._fail("M1 identity")
-        if int(d1[1]) != nonce_uws:
-            return self._fail("M1 nonce")
-
-        print("M1  UWS  -> SUB   authentication request")
-
-        # ------------------------------
-        # M2: SUB -> UWS
-        # ------------------------------
-        ts2 = self._fresh_timestamp()
-        m2 = self._encrypt(
-            sub,
-            uws,
-            [
-                self.entities[sub].identifier,
-                str(nonce_uws),
-                f"{ts2:.9f}",
-            ],
-        )
-        d2 = self._decrypt(sub, uws, m2)
-
-        if d2[0] != self.entities[sub].identifier:
-            return self._fail("M2 identity")
-        if int(d2[1]) != nonce_uws:
-            return self._fail("M2 nonce")
-        if not self._within_window(float(d1[2]), float(d2[2])):
-            return self._fail("M2 timestamp")
-
-        self.sessions[(uws, sub)] = self._session(uws, sub)
-        self.sessions[(sub, uws)] = self.sessions[(uws, sub)]
-
-        print("M2  SUB  -> UWS   acknowledgement")
-        print("     UWS <-> SUB session established")
-
-        # ------------------------------
-        # M3: UWS -> SUB (sensor data)
-        # ------------------------------
-        sensor = self._sensor_data()
-        ts3 = self._fresh_timestamp()
-
-        m3 = self._encrypt(
-            uws,
-            sub,
-            [
-                self.entities[uws].identifier,
-                str(sensor["Temp"]),
-                str(sensor["Press"]),
-                str(sensor["CurrVel"]),
-                str(sensor["Sal"]),
-                f"{ts3:.9f}",
-            ],
-        )
-        d3 = self._decrypt(uws, sub, m3)
-
-        if d3[0] != self.entities[uws].identifier:
-            return self._fail("M3 identity")
-
-        env = {
-            "Temp": float(d3[1]),
-            "Press": float(d3[2]),
-            "CurrVel": float(d3[3]),
-            "Sal": float(d3[4]),
-        }
-
-        print(
-            "M3  UWS  -> SUB   sensor data "
-            f"{env}"
-        )
-        print("     SUB aggregates ENV =", env)
-
-        # ------------------------------
-        # M4: SUB -> B
-        # ------------------------------
-        nonce_sub = new_nonce()
-        ts4 = self._fresh_timestamp()
-
-        m4 = self._encrypt(
-            sub,
-            buoy,
-            [
-                self.entities[sub].identifier,
-                str(nonce_sub),
-                f"{ts4:.9f}",
-            ],
-        )
-        d4 = self._decrypt(sub, buoy, m4)
-
-        if d4[0] != self.entities[sub].identifier:
-            return self._fail("M4 identity")
-        if int(d4[1]) != nonce_sub:
-            return self._fail("M4 nonce")
-
-        print("M4  SUB  -> B     authentication request")
-
-        # ------------------------------
-        # M5: B -> SUB
-        # ------------------------------
-        ts5 = self._fresh_timestamp()
-        m5 = self._encrypt(
-            buoy,
-            sub,
-            [
-                self.entities[buoy].identifier,
-                str(nonce_sub),
-                f"{ts5:.9f}",
-            ],
-        )
-        d5 = self._decrypt(buoy, sub, m5)
-
-        if d5[0] != self.entities[buoy].identifier:
-            return self._fail("M5 identity")
-        if int(d5[1]) != nonce_sub:
-            return self._fail("M5 nonce")
-        if not self._within_window(float(d4[2]), float(d5[2])):
-            return self._fail("M5 timestamp")
-
-        self.sessions[(sub, buoy)] = self._session(sub, buoy)
-        self.sessions[(buoy, sub)] = self.sessions[(sub, buoy)]
-
-        print("M5  B     -> SUB   acknowledgement")
-        print("     SUB <-> B session established")
-
-        # ------------------------------
-        # M6: SUB -> B (ENV + alerts)
-        # ------------------------------
-        alerts = [
-            "jamming",
-            "spoofing",
-            "eavesdropping",
-        ]
-        ts6 = self._fresh_timestamp()
-
-        m6 = self._encrypt(
-            sub,
-            buoy,
-            [
-                self.entities[sub].identifier,
-                str(env["Temp"]),
-                str(env["Press"]),
-                str(env["CurrVel"]),
-                str(env["Sal"]),
-                ",".join(alerts),
-                f"{ts6:.9f}",
-            ],
-        )
-        d6 = self._decrypt(sub, buoy, m6)
-
-        if d6[0] != self.entities[sub].identifier:
-            return self._fail("M6 identity")
-
-        print(
-            "M6  SUB  -> B     ENV + alerts "
-            f"{alerts}"
-        )
-
-        # ------------------------------
-        # M7: B -> SAT
-        # ------------------------------
-        nonce_b = new_nonce()
-        ts7 = self._fresh_timestamp()
-
-        m7 = self._encrypt(
-            buoy,
-            satellite,
-            [
-                self.entities[buoy].identifier,
-                str(nonce_b),
-                f"{ts7:.9f}",
-            ],
-        )
-        d7 = self._decrypt(buoy, satellite, m7)
-
-        if d7[0] != self.entities[buoy].identifier:
-            return self._fail("M7 identity")
-        if int(d7[1]) != nonce_b:
-            return self._fail("M7 nonce")
-
-        print("M7  B     -> SAT   authentication request")
-
-        # ------------------------------
-        # M8: SAT -> B
-        # ------------------------------
-        ts8 = self._fresh_timestamp()
-        m8 = self._encrypt(
-            satellite,
-            buoy,
-            [
-                self.entities[satellite].identifier,
-                str(nonce_b),
-                f"{ts8:.9f}",
-            ],
-        )
-        d8 = self._decrypt(satellite, buoy, m8)
-
-        if d8[0] != self.entities[satellite].identifier:
-            return self._fail("M8 identity")
-        if int(d8[1]) != nonce_b:
-            return self._fail("M8 nonce")
-        if not self._within_window(float(d7[2]), float(d8[2])):
-            return self._fail("M8 timestamp")
-
-        self.sessions[(buoy, satellite)] = self._session(buoy, satellite)
-        self.sessions[(satellite, buoy)] = self.sessions[(buoy, satellite)]
-
-        print("M8  SAT  -> B     acknowledgement")
-        print("     B <-> SAT session established")
-
-        # ------------------------------
-        # M9: B -> SAT (ENV + alerts + GPS)
-        # ------------------------------
-        gps = self._gps_data()
-        ts9 = self._fresh_timestamp()
-
-        m9 = self._encrypt(
-            buoy,
-            satellite,
-            [
-                self.entities[buoy].identifier,
-                str(env["Temp"]),
-                str(env["Press"]),
-                str(env["CurrVel"]),
-                str(env["Sal"]),
-                ",".join(alerts),
-                str(gps["lat"]),
-                str(gps["lon"]),
-                f"{ts9:.9f}",
-            ],
-        )
-        d9 = self._decrypt(buoy, satellite, m9)
-
-        if d9[0] != self.entities[buoy].identifier:
-            return self._fail("M9 identity")
-
-        print(
-            "M9  B     -> SAT   ENV + alerts + GPS "
-            f"{gps}"
-        )
-
-        # ------------------------------
-        # M10: SAT -> BS
-        # ------------------------------
-        nonce_sat = new_nonce()
-        ts10 = self._fresh_timestamp()
-
-        m10 = self._encrypt(
-            satellite,
-            "BS",
-            [
-                self.entities[satellite].identifier,
-                str(nonce_sat),
-                f"{ts10:.9f}",
-            ],
-        )
-        d10 = self._decrypt(satellite, "BS", m10)
-
-        if d10[0] != self.entities[satellite].identifier:
-            return self._fail("M10 identity")
-        if int(d10[1]) != nonce_sat:
-            return self._fail("M10 nonce")
-
-        print("M10 SAT  -> BS    authentication request")
-
-        # ------------------------------
-        # M11: BS -> SAT
-        # ------------------------------
-        ts11 = self._fresh_timestamp()
-        m11 = self._encrypt(
-            "BS",
-            satellite,
-            [
-                self.entities["BS"].identifier,
-                str(nonce_sat),
-                f"{ts11:.9f}",
-            ],
-        )
-        d11 = self._decrypt("BS", satellite, m11)
-
-        if d11[0] != self.entities["BS"].identifier:
-            return self._fail("M11 identity")
-        if int(d11[1]) != nonce_sat:
-            return self._fail("M11 nonce")
-        if not self._within_window(float(d10[2]), float(d11[2])):
-            return self._fail("M11 timestamp")
-
-        self.sessions[(satellite, "BS")] = self._session(satellite, "BS")
-        self.sessions[("BS", satellite)] = self.sessions[(satellite, "BS")]
-
-        print("M11 BS    -> SAT   acknowledgement")
-        print("     SAT <-> BS session established")
-
-        # ------------------------------
-        # M12: SAT -> BS (final data package)
-        # ------------------------------
-        logs = self._mission_logs()
-        ts12 = self._fresh_timestamp()
-
-        m12 = self._encrypt(
-            satellite,
-            "BS",
-            [
-                self.entities[satellite].identifier,
-                str(env["Temp"]),
-                str(env["Press"]),
-                str(env["CurrVel"]),
-                str(env["Sal"]),
-                ",".join(alerts),
-                str(gps["lat"]),
-                str(gps["lon"]),
-                logs,
-                f"{ts12:.9f}",
-            ],
-        )
-        d12 = self._decrypt(satellite, "BS", m12)
-
-        if d12[0] != self.entities[satellite].identifier:
-            return self._fail("M12 identity")
-
-        final_payload = {
-            "Temp": float(d12[1]),
-            "Press": float(d12[2]),
-            "CurrVel": float(d12[3]),
-            "Sal": float(d12[4]),
-            "Alerts": d12[5].split(","),
-            "GPS": {
-                "lat": float(d12[6]),
-                "lon": float(d12[7]),
-            },
-            "LOGS": d12[8],
-        }
-
-        print("M12 SAT  -> BS    final mission package")
-        print("     BS received:")
-        print(f"       ENV    = {final_payload['Temp']}, "
-              f"{final_payload['Press']}, "
-              f"{final_payload['CurrVel']}, "
-              f"{final_payload['Sal']}")
-        print(f"       Alerts = {final_payload['Alerts']}")
-        print(f"       GPS    = {final_payload['GPS']}")
-        print(f"       LOGS   = {final_payload['LOGS']}")
-
-        print("\n=== PROTOCOL COMPLETE: SUCCESS ===")
-        return True
-
-    # -----------------------------------------------------------------------
-    # Fallback architecture
-    # -----------------------------------------------------------------------
-
-    def choose_peer(
-        self,
-        current: str,
-        candidates: List[str],
-        unavailable: Optional[set[str]] = None,
-    ) -> Optional[str]:
-        """
-        Paper fallback behavior:
-          - SUB may reauthenticate with another registered buoy.
-          - B may use another registered satellite.
-        """
-        unavailable = unavailable or set()
-
-        for peer in candidates:
-            if peer not in unavailable and peer in self.entities[current].peers:
-                return peer
-
+    def _send_message(self, message_name: str, msg_no: int,
+                      sender: str, receiver: str, fields: List[str],
+                      retries_enabled: bool = True) -> Optional[List[str]]:
+        """Send one protocol message, applying Code-2 channel loss model."""
+        attempts = 0
+        while attempts < (MAX_RETRY if retries_enabled else 1):
+            attempts += 1
+            self.packet_stats["attempts"] += 1
+            delay = self.acoustic_delay(sender, receiver)
+            self.delay_log.append(delay)
+            self.hop_delay_log.append((msg_no, sender, receiver, delay))
+
+            if random.random() < LOSS_RATE:
+                self.packet_stats["lost"] += 1
+                if attempts < MAX_RETRY:
+                    self.packet_stats["retries"] += 1
+                    continue
+                self.packet_stats["failed"] += 1
+                return None
+
+            self.use_energy(sender, "tx")
+            self.use_energy(receiver, "rx")
+            cipher = self._encrypt_fields(sender, receiver, fields)
+            decoded = self._decrypt_fields(sender, receiver, cipher)
+            self.packet_stats["delivered"] += 1
+            self.message_records.append({
+                "message": message_name,
+                "number": msg_no,
+                "sender": sender,
+                "receiver": receiver,
+                "fields": fields,
+                "ciphertext_bytes": len(cipher),
+                "delay_s": delay,
+            })
+            return decoded
         return None
 
-    # -----------------------------------------------------------------------
-    # Example data generation
-    # -----------------------------------------------------------------------
+    def _check_timestamp(self, t_sent: float, t_recv: float) -> bool:
+        return abs(t_recv - t_sent) < TSW
 
-    @staticmethod
-    def _sensor_data() -> Dict[str, float]:
-        # The paper defines the four sensed quantities; the simulator uses
-        # representative sample values only.
-        return {
-            "Temp": 22.4,
-            "Press": 3.1,
-            "CurrVel": 1.2,
-            "Sal": 35.6,
+    def _new_session(self, a: str, b: str) -> str:
+        sid = h("SESSION", a, b, new_nonce())
+        self.sessions[(a, b)] = sid
+        self.sessions[(b, a)] = sid
+        return sid
+
+    # ---------------------------------------------------------------------
+    # One exact NSL hop -- mirrors the Scyther file
+    # ---------------------------------------------------------------------
+
+    def authenticate_hop(self, hop: int, initiator: str, responder: str,
+                         labels: Tuple[str, str, str],
+                         message_numbers: Tuple[int, int, int],
+                         message_names: Tuple[str, str, str]) -> bool:
+        taga, tagb, tagc = labels
+        m1, m2, m3 = message_numbers
+        n1 = new_nonce()
+        sent_ts = time.time()
+
+        # M(a): {tag_a, initiator, Ni}pk(responder)
+        decoded1 = self._send_message(
+            message_names[0], m1, initiator, responder,
+            [taga, initiator, str(n1)],
+        )
+        if decoded1 is None:
+            return False
+        if decoded1 != [taga, initiator, str(n1)]:
+            return False
+
+        # Responder generates Nr and returns {tag_b, Ni, Nr, responder}.
+        nr = new_nonce()
+        responder_ts = time.time()
+        decoded2 = self._send_message(
+            message_names[1], m2, responder, initiator,
+            [tagb, str(n1), str(nr), responder],
+        )
+        if decoded2 is None:
+            return False
+        if decoded2 != [tagb, str(n1), str(nr), responder]:
+            return False
+
+        if not self._check_timestamp(sent_ts, responder_ts):
+            return False
+
+        # M(c): {tag_c, Nr}pk(responder)
+        decoded3 = self._send_message(
+            message_names[2], m3, initiator, responder,
+            [tagc, str(nr)],
+        )
+        if decoded3 is None:
+            return False
+        if decoded3 != [tagc, str(nr)]:
+            return False
+
+        self._new_session(initiator, responder)
+        self.use_energy(initiator, "auth")
+        self.use_energy(responder, "auth")
+        print(f"[AUTH OK] {initiator} <-> {responder}  "
+              f"Ni={str(n1)[:10]}... Nr={str(nr)[:10]}...")
+        return True
+
+    # ---------------------------------------------------------------------
+    # Exact 12-message authentication sequence
+    # ---------------------------------------------------------------------
+
+    def run_ns_authentication(self, buoy: str = "B1", satellite: str = "SAT1") -> bool:
+        print("\n=== M1-M12 NSL AUTHENTICATION ===")
+        print(f"Path: U1 -> S1 -> {buoy} -> {satellite} -> BS")
+
+        self.update_mobility()
+
+        hops = [
+            (1, "U1", "S1", TAGS[1], (1, 2, 3), ("M1", "M2", "M3")),
+            (2, "S1", buoy, TAGS[2], (4, 5, 6), ("M4", "M5", "M6")),
+            (3, buoy, satellite, TAGS[3], (7, 8, 9), ("M7", "M8", "M9")),
+            (4, satellite, "BS", TAGS[4], (10, 11, 12), ("M10", "M11", "M12")),
+        ]
+
+        for hop, a, b, tags, nums, names in hops:
+            ok = self.authenticate_hop(hop, a, b, tags, nums, names)
+            print(f"Hop {hop}: {a} <-> {b}: {'SUCCESS' if ok else 'FAILED'}")
+            if not ok:
+                return False
+        print("=== ALL M1-M12 MESSAGES SUCCESSFUL ===")
+        return True
+
+    # ---------------------------------------------------------------------
+    # Data flow is kept separate from Scyther's M1-M12 authentication.
+    # This avoids the earlier mismatch where M3/M6/M9/M12 were simultaneously
+    # treated as NSL messages and sensor/data packets.
+    # ---------------------------------------------------------------------
+
+    def run_data_flow(self, buoy: str = "B1", satellite: str = "SAT1") -> bool:
+        print("\n=== SENSOR / ENVIRONMENT DATA FLOW ===")
+        sensor = {
+            "Temp": round(random.uniform(10, 30), 2),
+            "Pressure": round(random.uniform(1, 5), 2),
+            "Velocity": round(random.uniform(0, 3), 2),
+            "Salinity": round(random.uniform(30, 40), 2),
         }
+        gps = {"lat": 17.3850, "lon": 78.4867}
+        alerts = ["jamming", "spoofing", "eavesdropping"]
+        logs = "mission=UWC-DEMO,status=nominal,events=0"
 
-    @staticmethod
-    def _gps_data() -> Dict[str, float]:
-        return {
-            "lat": 17.3850,
-            "lon": 78.4867,
+        print(f"UWS sensor data: {sensor}")
+        print(f"SUB receives ENV and forwards it to {buoy}")
+        print(f"BUOY adds GPS={gps} and forwards to {satellite}")
+        print(f"SAT adds LOGS and forwards the complete package to BS")
+
+        self.data_payload = {
+            "ENV": sensor,
+            "ALERTS": alerts,
+            "GPS": gps,
+            "LOGS": logs,
         }
+        return True
+
+    # ---------------------------------------------------------------------
+    # Code-2 evaluation features
+    # ---------------------------------------------------------------------
+
+    def replay_test(self) -> None:
+        print("\n=== REPLAY / FRESHNESS TEST ===")
+        old_ts = time.time() - (TSW + 1.0)
+        accepted = self._check_timestamp(old_ts, time.time())
+        print("Replay ACCEPTED (BUG)" if accepted else "Replay blocked")
+
+    def detect_anomalies(self, threshold: float = ANOMALY_THRESHOLD) -> List[int]:
+        if len(self.delay_log) < 4:
+            return []
+        mean = statistics.mean(self.delay_log)
+        stdev = statistics.stdev(self.delay_log)
+        if stdev == 0:
+            return []
+        return [i for i, delay in enumerate(self.delay_log)
+                if abs((delay - mean) / stdev) > threshold]
+
+    def run_rounds_with_fallback(self, rounds: int = 5) -> None:
+        print("\n=== REPEATED EXPERIMENT: 5 ROUNDS + FALLBACK ===")
+        for i in range(1, rounds + 1):
+            print(f"\n[Round {i}]")
+            # Model the Code-2 fallback scenario, but do not alter the NSL core.
+            unavailable_b = {"B1"} if i % 2 == 1 else set()
+            unavailable_s = {"SAT1"} if i % 3 == 0 else set()
+            buoy = self.choose_peer("S1", ["B1", "B2"], unavailable_b)
+            if buoy is None:
+                self.round_results.append(False)
+                print("No registered BUOY available")
+                continue
+            sat = self.choose_peer(buoy, ["SAT1", "SAT2"], unavailable_s)
+            if sat is None:
+                self.round_results.append(False)
+                print("No registered SAT available")
+                continue
+
+            ok = self.run_ns_authentication(buoy=buoy, satellite=sat)
+            self.round_results.append(ok)
+            print(f"Result: {'SUCCESS' if ok else 'FAILED'}")
+
+    def choose_peer(self, current: str, candidates: List[str],
+                    unavailable: Optional[set[str]] = None) -> Optional[str]:
+        unavailable = unavailable or set()
+        for candidate in candidates:
+            if candidate in self.entities[current].peers and candidate not in unavailable:
+                return candidate
+        return None
+
+    def communication_bits(self) -> int:
+        # Code-2 reference retained for comparison, plus actual ciphertext
+        # sizes observed in this M1-M12 run.
+        actual = sum(int(r["ciphertext_bytes"]) * 8 for r in self.message_records)
+        reference = 296
+        return actual if actual else reference
+
+    def energy_summary(self) -> Dict[str, float]:
+        used = {n: BAT_uJ - value for n, value in self.battery.items()}
+        return used
+
+    def aes_gcm_benchmark(self) -> Optional[float]:
+        if AESGCM is None:
+            return None
+        key = AESGCM.generate_key(bit_length=256)
+        aes = AESGCM(key)
+        nonce = os.urandom(12)
+        payload = b"UWC-AES-GCM-BENCHMARK"
+        t0 = time.perf_counter()
+        ct = aes.encrypt(nonce, payload, None)
+        aes.decrypt(nonce, ct, None)
+        return time.perf_counter() - t0
+
+    # ---------------------------------------------------------------------
+    # Scaling model and output figures -- same family as Code 2
+    # ---------------------------------------------------------------------
+
+    def scaling_data(self, sizes: List[int]) -> Tuple[List[int], List[float], List[float], List[float], List[float]]:
+        delays, energies, comms, throughput = [], [], [], []
+        base_path = [("U1", "S1"), ("S1", "B2"), ("B2", "SAT2"), ("SAT2", "BS")]
+        for n in sizes:
+            path_delays = []
+            for _ in range(max(1, n // 8)):
+                path_delays.append(sum(self._scale_delay(a, b) for a, b in base_path))
+            mean_delay = statistics.mean(path_delays)
+            delays.append(mean_delay)
+            energies.append(AUTH_uJ + n * 0.1)
+            comms.append(296 + n * 10)
+            throughput.append(1.0 / mean_delay if mean_delay else 0.0)
+        return sizes, delays, energies, comms, throughput
+
+    def _scale_delay(self, sender: str, receiver: str) -> float:
+        key = (sender, receiver) if (sender, receiver) in DISTS else (receiver, sender)
+        distance = max(10.0, DISTS.get(key, 500) + random.uniform(-20, 20))
+        prop = distance / SOUND_MPS
+        absorption = self.thorp_db_per_km(ACOUSTIC_FREQ_KHZ) * distance / 1000 * 1e-4
+        multipath = abs(random.gauss(0, 0.005))
+        return prop + absorption + multipath
 
     @staticmethod
-    def _mission_logs() -> str:
-        return "mission=UWC-DEMO,status=nominal,events=0"
+    def save_fig(fig, filename: str) -> None:
+        fig.tight_layout()
+        fig.savefig(filename, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Saved: {filename}")
 
-    @staticmethod
-    def _fail(reason: str) -> bool:
-        print(f"[PROTOCOL FAIL] {reason}")
-        return False
+    def generate_graphs(self) -> None:
+        ns, delays, energies, comms, throughput = self.scaling_data(SCALE_SIZES)
+
+        # Graph 1: topology
+        graph = nx.Graph()
+        graph.add_edges_from(EDGES)
+        colors = {
+            "U1": "#3498db", "U2": "#3498db", "S1": "#2ecc71",
+            "B1": "#e67e22", "B2": "#2ecc71",
+            "SAT1": "#9b59b6", "SAT2": "#9b59b6", "BS": "#f39c12",
+        }
+        pos = {
+            "U1": (0.35, 1.0), "U2": (0.65, 1.0), "S1": (0.5, 0.72),
+            "B1": (0.2, 0.44), "B2": (0.8, 0.44),
+            "SAT1": (0.2, 0.16), "SAT2": (0.8, 0.16), "BS": (0.5, -0.1),
+        }
+        fig, ax = plt.subplots(figsize=(10, 7))
+        nx.draw_networkx(graph, pos, ax=ax,
+                         node_color=[colors[n] for n in graph.nodes()],
+                         node_size=1100, font_size=10, font_weight="bold",
+                         edge_color="#7f8c8d", width=2, with_labels=True)
+        active = [("U1", "S1"), ("S1", "B2"), ("B2", "SAT2"), ("SAT2", "BS")]
+        nx.draw_networkx_edges(graph, pos, edgelist=active, ax=ax,
+                               edge_color="#27ae60", width=3.5)
+        ax.set_title("PEECC-UWCN Topology | M1-M12 Active Path\n"
+                     "Code-2 evaluation layer may fall back between registered peers")
+        ax.legend(handles=[
+            mpatches.Patch(color="#3498db", label="UWS"),
+            mpatches.Patch(color="#2ecc71", label="SUB / active relay"),
+            mpatches.Patch(color="#e67e22", label="BUOY"),
+            mpatches.Patch(color="#9b59b6", label="SAT"),
+            mpatches.Patch(color="#f39c12", label="BS"),
+        ], loc="upper left", fontsize=8)
+        self.save_fig(fig, "output_topology.png")
+
+        # Graph 2: delay
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.plot(ns, delays, marker="o", lw=2, label="M1-M12 path delay")
+        ax.axhline(0.211, ls="--", lw=1.5, label="Code-2 reference 211 ms")
+        ax.set_title("Authentication Path Delay vs Number of Nodes")
+        ax.set_xlabel("Number of Nodes")
+        ax.set_ylabel("Mean Delay (s)")
+        ax.legend()
+        ax.grid(alpha=0.4)
+        self.save_fig(fig, "output_delay.png")
+
+        # Graph 3: energy
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.plot(ns, energies, marker="o", lw=2, label="Evaluation energy model")
+        ax.axhline(280, ls="--", lw=1.5, label="Ref [24] reference")
+        ax.axhline(2300, ls=":", lw=1.5, label="Ref [22] reference")
+        ax.set_title("Energy Consumption vs Number of Nodes")
+        ax.set_xlabel("Number of Nodes")
+        ax.set_ylabel("Energy per Auth Cycle (uJ)")
+        ax.legend()
+        ax.grid(alpha=0.4)
+        self.save_fig(fig, "output_energy.png")
+
+        # Graph 4: communication cost
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.plot(ns, comms, marker="o", lw=2, label="Evaluation estimate")
+        for ref in ("Ref [21]", "Ref [22]", "Ref [23]"):
+            ax.plot(ns, [COMPARISON[ref]["comm"] + n * 10 for n in ns], "--",
+                    lw=1.1, label=ref)
+        ax.set_title("Communication Cost vs Number of Nodes")
+        ax.set_xlabel("Number of Nodes")
+        ax.set_ylabel("Bits")
+        ax.legend(fontsize=8)
+        ax.grid(alpha=0.4)
+        self.save_fig(fig, "output_comm_cost.png")
+
+        # Graph 5: comparison
+        schemes = list(COMPARISON)
+        x = list(range(len(schemes)))
+        width = 0.35
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+        axes[0].bar([v - width / 2 for v in x],
+                    [COMPARISON[s]["uws"] for s in schemes], width,
+                    label="UWS/BS")
+        axes[0].bar([v + width / 2 for v in x],
+                    [COMPARISON[s]["sub"] for s in schemes], width,
+                    label="SUB/SAT", alpha=0.55)
+        axes[0].set_yscale("log")
+        axes[0].set_xticks(x)
+        axes[0].set_xticklabels(schemes, rotation=20)
+        axes[0].set_ylabel("Time (ms)")
+        axes[0].set_title("Computational Cost")
+        axes[0].legend(fontsize=8)
+        axes[1].bar(schemes, [COMPARISON[s]["comm"] for s in schemes])
+        axes[1].set_ylabel("Bits")
+        axes[1].set_title("Communication Overhead")
+        axes[1].tick_params(axis="x", rotation=20)
+        self.save_fig(fig, "output_comparison.png")
+
+        # Graph 6: throughput
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.plot(ns, throughput, marker="s", lw=2, label="1 / mean path delay")
+        ax.set_title("Authentication Throughput vs Network Scale")
+        ax.set_xlabel("Number of Nodes")
+        ax.set_ylabel("Authentications per Second")
+        ax.legend()
+        ax.grid(alpha=0.4)
+        self.save_fig(fig, "output_throughput.png")
+
+        # Graph 7: battery
+        labels = list(self.battery)
+        percentages = [100 * self.battery[n] / BAT_uJ for n in labels]
+        fig, ax = plt.subplots(figsize=(9, 5))
+        bars = ax.bar(labels, percentages)
+        for bar, pct in zip(bars, percentages):
+            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.05,
+                    f"{pct:.2f}%", ha="center", va="bottom", fontsize=8)
+        ax.set_ylim(0, 105)
+        ax.axhline(90, ls="--", lw=1, label="90% threshold")
+        ax.set_title("Battery Remaining per Node")
+        ax.set_ylabel("Battery Remaining (%)")
+        ax.legend()
+        ax.grid(axis="y", alpha=0.4)
+        self.save_fig(fig, "output_battery.png")
+
+    # ---------------------------------------------------------------------
+    # Final report
+    # ---------------------------------------------------------------------
+
+    def print_report(self) -> None:
+        anomalies = self.detect_anomalies()
+        aes_time = self.aes_gcm_benchmark()
+        used = self.energy_summary()
+        comm_bits = self.communication_bits()
+
+        print("\n=== RUN SUMMARY ===")
+        overall = self.clean_result if self.clean_result is not None else False
+        print(f"M1-M12 clean authentication: {'SUCCESS' if overall else 'FAILED'}")
+        if self.round_results:
+            print(f"Evaluation rounds       : {sum(self.round_results)}/{len(self.round_results)} successful")
+        print(f"Messages attempted     : {self.packet_stats['attempts']}")
+        print(f"Messages delivered     : {self.packet_stats['delivered']}")
+        print(f"Packets lost           : {self.packet_stats['lost']}")
+        print(f"Retransmissions        : {self.packet_stats['retries']}")
+        print(f"Link failures          : {self.packet_stats['failed']}")
+        print(f"Mean acoustic delay    : {statistics.mean(self.delay_log) if self.delay_log else 0:.6f} s")
+        print(f"Max acoustic delay     : {max(self.delay_log) if self.delay_log else 0:.6f} s")
+        print(f"Communication estimate : {comm_bits} bits (observed encrypted payloads)")
+        print(f"Code-2 reference       : 296 bits/message")
+        print(f"Anomalous delay hops   : {anomalies if anomalies else 'none'}")
+        if aes_time is None:
+            print("AES-GCM benchmark      : unavailable (install cryptography)")
+        else:
+            print(f"AES-GCM benchmark      : {aes_time:.8f} s [benchmark only]")
+
+        print("\nEnergy consumed per node:")
+        for node, amount in used.items():
+            print(f"  {node:5s}: {amount:.2f} uJ  | remaining={100*self.battery[node]/BAT_uJ:.4f}%")
+
+        print("\nSensor payload delivered logically to BS:")
+        print(self.data_payload)
 
 
-# ---------------------------------------------------------------------------
-# Standalone demonstration
-# ---------------------------------------------------------------------------
+# ============================================================================
+# Main
+# ============================================================================
 
 def main() -> int:
-    protocol = UWCNProtocol()
-    protocol.register_network()
+    print("=" * 78)
+    print(" PEECC / UWC AUTHENTICATION + CODE-2 EVALUATION SINGLE-FILE RUNNER")
+    print("=" * 78)
 
-    ok = protocol.run_protocol(
-        uws="U1",
-        sub="S1",
-        buoy="B1",
-        satellite="SAT1",
-    )
+    sim = UWCSimulation()
+    sim.register_network()
 
-    print("\n=== REGISTERED RID COUNT ===")
-    print(len(protocol.registration_set))
+    # First: one clean deterministic protocol run.
+    clean = sim.run_ns_authentication("B1", "SAT1")
+    sim.clean_result = clean
+    print(f"\nClean M1-M12 run: {'SUCCESS' if clean else 'FAILED'}")
 
-    print("\n=== ESTABLISHED SESSIONS ===")
-    for (a, b), sid in sorted(protocol.sessions.items()):
-        print(f"{a:5s} <-> {b:5s} : {sid[:20]}...")
+    # Data is separate from the NSL messages, matching the Scyther model.
+    sim.run_data_flow("B1", "SAT1")
 
-    return 0 if ok else 1
+    # Code-2-style evaluation tests.
+    sim.replay_test()
+    sim.run_rounds_with_fallback(rounds=5)
+
+    sim.generate_graphs()
+    sim.print_report()
+
+    print("\n=== OUTPUT FILES ===")
+    for filename in (
+        "output_topology.png", "output_delay.png", "output_energy.png",
+        "output_comm_cost.png", "output_comparison.png",
+        "output_throughput.png", "output_battery.png",
+    ):
+        print(f"  {filename}")
+
+    print("\nScyther mapping:")
+    print("  Hop 1: M1/M2/M3   = uwchop1(UWS,SUB)")
+    print("  Hop 2: M4/M5/M6   = uwchop2(SUB,BUOY)")
+    print("  Hop 3: M7/M8/M9   = uwchop3(BUOY,SAT)")
+    print("  Hop 4: M10/M11/M12 = uwchop4(SAT,BS)")
+    print("\nUse the supplied uwc_protocol.spdl with Scyther for formal verification.")
+    return 0 if clean else 1
 
 
 if __name__ == "__main__":
