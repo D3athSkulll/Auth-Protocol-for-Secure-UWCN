@@ -1,0 +1,135 @@
+%======================================================================
+\chapter{Discussion, Limitations and Conclusion}
+\label{ch:conc}
+%======================================================================
+
+\section{Where our implementation differs from the base paper}
+\label{sec:deviations}
+
+Reporting an implementation as though it reproduced a paper exactly, when it did not, would
+be misleading. Four differences are material and we set them out explicitly.
+
+\begin{table}[H]
+\centering
+\caption{Deliberate divergences from the base paper.}
+\label{tab:deviations}
+\small
+\begin{tabularx}{\textwidth}{@{}L{6mm} L{34mm} L{40mm} X@{}}
+\toprule
+& \textbf{Paper specifies} & \textbf{We implemented} & \textbf{Reason and effect}\\
+\midrule
+V1 & Pentatope ECC (PEECC) over a 5D point group, claimed DLP complexity $\approx 2^{5n/2}$
+   & Standard secp256r1 (NIST P-256), 2D, $\approx 2^{2n/2}$
+   & The paper gives no concrete curve parameters, no reference implementation and no test
+     vectors for PEECC, so we could not reproduce it with confidence. Our results are
+     therefore a \emph{lower bound} on the paper's claimed security level, not a
+     reproduction of it. Everything else in the protocol is independent of this choice.\\
+\addlinespace[3pt]
+V2 & $E\{\PU_{recv},\langle m \rangle\}$ --- direct public-key encryption; AES-128 named in
+     the energy analysis
+   & ECDH key agreement followed by AES-256-GCM
+   & This is the standard hybrid realisation of public-key encryption (the construction
+     ECIES uses). It is functionally equivalent for the protocol's purposes and is what a
+     real deployment would do, since direct public-key encryption of every message would be
+     prohibitively expensive.\\
+\addlinespace[3pt]
+V3 & Adaptive $\Delta T$ from a rolling average of observed inter-node delays
+   & Fixed $\Delta T = 5$\,s
+   & The adaptive mechanism is described but not specified numerically. A fixed window is
+     the conservative choice and is what our replay test exercises. Making it adaptive is
+     listed in the future work.\\
+\addlinespace[3pt]
+V4 & Signature-based validation at registration (Proposition~1)
+   & Hash-based verification value $\vartheta_i = H(\RID_i \cat \PU_i)$
+   & We implemented the registration formulae of Section~IV-B, which are hash-based. The
+     paper's Proposition~1 additionally invokes a signature; the two descriptions in the
+     paper are not fully aligned, and we followed the concrete formulae rather than the
+     prose.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Limitations}
+
+\begin{itemize}
+\item \textbf{Simulation, not hardware.} Energy figures come from published ARM Cortex-M4
+      benchmarks, not from measurements on an acoustic modem. Real modems (EvoLogics S2C,
+      Teledyne Benthos ATM-900) have transmit power in the watts, so the TX and RX figures
+      here are optimistic by orders of magnitude in absolute terms --- though their
+      \emph{ratio} to the cryptographic cost, which is the point being made, holds.
+\item \textbf{Independent loss.} Our Bernoulli model treats losses as independent. Real
+      acoustic channels have bursty loss driven by ship noise, thermoclines and surface
+      conditions, for which a Gilbert--Elliott two-state model would be more faithful.
+\item \textbf{Simplified mobility.} The $\pm10$\,m per-round drift is one-dimensional, and
+      does not model depth changes, currents, or nodes moving out of range entirely.
+\item \textbf{Scyther is bounded.} Verification is at \code{max-runs=5}. This is standard
+      practice and no attack was found, but it is a bounded search, not an unbounded proof.
+\item \textbf{The anomaly detector is offline.} \code{detect\_anomalies} runs over the
+      accumulated delay log at the end of a run. A deployed version would need a streaming
+      estimator with an exponentially weighted moving average.
+\item \textbf{No revocation implemented.} The paper's revocation list is described in
+      Chapter~\ref{ch:proto} but our simulator does not implement or exercise it.
+\end{itemize}
+
+\section{Future work}
+
+\begin{enumerate}
+\item \textbf{Post-quantum key agreement.} Shor's algorithm breaks ECDH on a sufficiently
+      large quantum computer, and underwater deployments have service lives measured in
+      years. Substituting CRYSTALS-Kyber (NIST's selected KEM) for ECDH is tractable
+      precisely because of the protocol's hop-wise modularity: only the key-agreement layer
+      changes, and the message structure, freshness logic and fallback all stay as they are.
+      The cost is message size --- a Kyber-768 ciphertext is 1088 bytes against 32 for an
+      ECDH point --- which on a 10\,kbps channel is the whole difficulty and would need
+      study.
+\item \textbf{Implement PEECC.} Building the pentatope construction with concrete parameters
+      would let the paper's $2^{5n/2}$ complexity claim be tested rather than assumed, and
+      would close divergence V1.
+\item \textbf{Adaptive $\Delta T$.} Maintain a rolling mean $\mu_d$ and standard deviation
+      $\sigma_d$ of observed inter-node delay and set $\Delta T = \mu_d + 3\sigma_d$. This
+      would tighten the replay window in calm conditions and widen it under adverse ones,
+      improving both security and reliability over a fixed 5\,s.
+\item \textbf{Hardware benchmarking.} Measure real energy on an acoustic modem, replacing
+      the literature figures with instrumented ones.
+\item \textbf{Hybrid acoustic--optical links.} Underwater optical modems reach Mbps rates
+      below about 100\,m. A protocol that selects the link type by distance would transform
+      the throughput picture for short hops such as UWS $\to$ SUB, where 150\,m is well
+      within optical range.
+\item \textbf{Multipath routing.} Rather than failing over to a backup only after the
+      primary dies, send over multiple paths concurrently for redundancy --- valuable where
+      a lost authentication means a lost sensing window.
+\item \textbf{Streaming anomaly detection with response.} Move the $z$-score detector
+      online and connect it to the Alerts field the base paper already carries in $M_6$,
+      $M_9$ and $M_{12}$, so that a detected injection propagates to the base station.
+\end{enumerate}
+
+\section{Conclusion}
+
+The base paper addresses a genuine gap: authentication for underwater acoustic networks,
+where the channel is slow, narrow, lossy and energy-scarce enough that conventional security
+is unusable. Its design decision --- authenticate each hop independently with a fresh nonce
+and a bounded timestamp, rather than end to end --- is the right one for the medium, and it
+is what makes the reported 2112-bit, 0.4\,ms, 48.8\,\uJ{} figures achievable.
+
+We reproduced that protocol as a working eight-node simulator and verified it formally. In
+doing so we corrected a serious flaw in our own first implementation: a repeating-key XOR
+cipher, which offered no real confidentiality and no integrity at all, was replaced with
+AES-256-GCM authenticated encryption. We replaced invented delay constants with the Thorp
+absorption model, added a 15\,\% loss channel with retransmission, tracked battery
+depletion per node, gave the AUVs motion, and built a detector for the delay-injection
+attack the paper names but does not counter. We restructured the Scyther model from one
+tangled five-role protocol into four independent Needham--Schroeder--Lowe hops, which is
+both more faithful to the paper's design and what allowed all 32 claims to verify.
+
+Two findings are worth carrying forward. First, in this setting \textbf{message size
+dominates cryptographic cost}: transmit and receive account for 64\,\% of the per-hop energy
+budget, so the paper's communication-overhead reduction is a more valuable contribution than
+its computational one. Second, \textbf{formal verification found a real design problem} ---
+our monolithic model's failure to establish \code{Niagree} was not a tooling artefact but a
+symptom of nonces crossing hop boundaries, and fixing the model meant fixing the design.
+
+The protocol as implemented authenticates a hop in 0.4\,ms and 48.8\,\uJ, sustains 98.65\,\%
+end-to-end reliability over a channel that drops one packet in seven, reroutes around a
+failed buoy without restarting the session, rejects replayed and tampered messages, and
+carries a machine-checked proof that its message design admits no attack by a
+Dolev--Yao adversary.

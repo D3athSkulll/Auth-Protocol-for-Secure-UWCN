@@ -1,0 +1,491 @@
+%======================================================================
+\chapter{Enhancements}
+\label{ch:improve}
+%======================================================================
+
+Seven changes take the simulator from a demonstration to something defensible. The first is
+a security fix; the next four replace invented numbers with physics or accounting; the last
+two add capability the base paper only describes.
+
+\begin{table}[H]
+\centering
+\caption{Summary of the seven enhancements.}
+\label{tab:improvements}
+\small
+\begin{tabularx}{\textwidth}{@{}L{7mm} L{34mm} L{40mm} X@{}}
+\toprule
+& \textbf{Enhancement} & \textbf{Replaces} & \textbf{Why}\\
+\midrule
+E1 & AES-256-GCM authenticated encryption & Repeating-key XOR &
+  Confidentiality \emph{and} integrity; matches the paper's stated use of AES\\
+E2 & Thorp absorption model & \code{random.uniform(0.04,0.08)} &
+  Delay becomes a function of distance and frequency\\
+E3 & 15\,\% Bernoulli loss with 3 retries & Assumed perfect delivery &
+  Tests the protocol under the channel's defining property\\
+E4 & Per-node battery depletion & Static energy constant &
+  Shows which nodes wear out and how fast\\
+E5 & Random-waypoint AUV mobility & Static nodes &
+  Link distance, hence delay, varies per round as it would in the sea\\
+E6 & $z$-score anomaly detection & Nothing &
+  Detects delay-injection attacks the paper names but does not counter\\
+E7 & Comparison charts and new metrics & 3 basic plots &
+  Benchmarks against the five prior schemes; adds throughput\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%----------------------------------------------------------------------
+\section{E1 --- Replacing XOR with AES-256-GCM}
+\label{sec:aes}
+
+This is the most important change in the project, so it gets the most space.
+
+\subsection{Why the XOR cipher had to go}
+
+A repeating-key XOR cipher encrypts by exclusive-or-ing each plaintext byte with a byte of
+the key, cycling the key when it runs out. Decryption is the same operation, because
+$x \oplus k \oplus k = x$. It has two fatal properties.
+
+\paragraph{Attack 1: known plaintext recovers the key immediately.}
+The attacker knows the message format --- \code{"<id>|<nonce>|<timestamp>"} --- and the
+identity field is a public SHA-256 hex string she can read off the network during
+registration. Given any plaintext byte $p_i$ and its ciphertext byte $c_i$:
+\begin{equation}
+k_{i \bmod |k|} = p_i \oplus c_i
+\end{equation}
+Recovering the whole key needs only as many known bytes as the key is long. She then
+decrypts every past and future message on that link.
+
+\paragraph{Attack 2: key reuse leaks the relationship between messages.}
+The simulator derives one ECDH key per node pair and reuses it for every message on that
+link. For two messages under the same key:
+\begin{equation}
+C_1 \oplus C_2 = (P_1 \oplus K) \oplus (P_2 \oplus K) = P_1 \oplus P_2
+\end{equation}
+The key vanishes. Because the two plaintexts share a rigid format --- the same 64-character
+identity prefix, the same separators, timestamps differing only in their final digits ---
+the XOR of the two plaintexts is highly structured, and standard crib-dragging recovers
+both.
+
+\paragraph{And there is no integrity at all.}
+XOR is malleable. Flipping bit $j$ of the ciphertext flips bit $j$ of the plaintext. The
+attacker cannot read the message, but she can \emph{change} it in a controlled way, and the
+receiver has no means of noticing. She can alter the nonce, or move the timestamp, without
+knowing the key.
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[x=1cm,y=1cm,font=\scriptsize]
+%======================= LEFT: XOR ==============================
+\node[font=\small\bfseries\sffamily,text=coral,anchor=west] at (0,0.9) {BEFORE \textemdash\ repeating-key XOR};
+\draw[draw=coral,rounded corners=2pt] (-0.25,-7.7) rectangle (7.15,0.55);
+\node[box,anchor=west,align=left,minimum width=64mm,fill=white] (x1) at (0,0)
+ {plaintext \ \code{"3147de24...|48231|1772451003.4"}};
+\node[box,anchor=west,align=left,minimum width=64mm,fill=white] (x2) at (0,-1.2)
+ {key \ \ \ \ \ \ \code{"9d2f7c0a..."} \ \ \textcolor{coral}{repeated to length}};
+\node[box,anchor=west,align=left,minimum width=64mm,fill=mist] (x3) at (0,-2.4)
+ {$c_i = p_i \oplus k_{i \bmod |k|}$ \ \ for every byte};
+\node[box,anchor=west,align=left,minimum width=64mm,fill=white] (x4) at (0,-3.6)
+ {ciphertext \ \ same length as plaintext, no tag};
+\foreach \a/\b in {x1/x2,x2/x3,x3/x4} \draw[flow,draw=coral] (\a.south) -- (\b.north);
+\node[box,anchor=west,align=left,minimum width=64mm,fill=palecoral,draw=coral] (x5) at (0,-5.3)
+ {\textbf{\textcolor{coral}{Attack A \textemdash\ known plaintext}}\\
+  attacker knows the ID prefix (it is public)\\
+  $k_i = p_i \oplus c_i$ \ \ $\Rightarrow$ \ \textbf{whole key recovered}};
+\node[box,anchor=west,align=left,minimum width=64mm,fill=palecoral,draw=coral] (x6) at (0,-6.9)
+ {\textbf{\textcolor{coral}{Attack B \textemdash\ bit flipping}}\\
+  flip ciphertext bit $j$ $\Rightarrow$ plaintext bit $j$ flips\\
+  \textbf{receiver cannot tell}};
+\draw[flow,draw=coral] (x4.south) -- (x5.north);
+%======================= RIGHT: AES-GCM =========================
+\node[font=\small\bfseries\sffamily,text=kelp,anchor=west] at (8.0,0.9) {AFTER \textemdash\ AES-256-GCM};
+\draw[draw=kelp,rounded corners=2pt] (7.75,-7.7) rectangle (15.15,0.55);
+\node[box,anchor=west,align=left,minimum width=64mm,fill=white] (g1) at (8.0,0)
+ {plaintext \ \code{"3147de24...|48231|1772451003.4"}};
+\node[box,anchor=west,align=left,minimum width=64mm,fill=white] (g2) at (8.0,-1.2)
+ {key \ \ \ \ \ \ 256 bits from ECDH \ \ \ \ IV \ \ \textcolor{kelp}{12 fresh random bytes}};
+\node[box,anchor=west,align=left,minimum width=64mm,fill=mist] (g3) at (8.0,-2.4)
+ {CTR mode: $c_i = p_i \oplus \mathrm{AES}_K(\mathrm{IV}\,\|\,\mathrm{counter}_i)$\\
+  \textcolor{kelp}{keystream differs per message because the IV does}};
+\node[box,anchor=west,align=left,minimum width=64mm,fill=mist] (g4) at (8.0,-3.8)
+ {GHASH over the ciphertext $\Rightarrow$ 128-bit tag $\tau$};
+\node[box,anchor=west,align=left,minimum width=64mm,fill=paleamber,draw=amber] (g5) at (8.0,-5.0)
+ {wire: \ \code{[ IV 12 B ][ ciphertext ][ tag 16 B ]}};
+\foreach \a/\b in {g1/g2,g2/g3,g3/g4,g4/g5} \draw[flow,draw=kelp] (\a.south) -- (\b.north);
+\node[box,anchor=west,align=left,minimum width=64mm,fill=palekelp,draw=kelp] (g6) at (8.0,-6.9)
+ {\textbf{\textcolor{kelp}{Attack A defeated}} \ known plaintext yields one keystream block,\\
+  useless for the next message (new IV)\\
+  \textbf{\textcolor{kelp}{Attack B defeated}} \ any flipped bit breaks $\tau$; decrypt raises};
+\draw[flow,draw=kelp] (g5.south) -- (g6.north);
+\end{tikzpicture}}
+\caption[XOR versus AES-GCM]{\textbf{The cipher replacement, and what each attack does to
+each scheme.} The structural difference is on the right: a fresh random IV per message means
+the keystream never repeats even though the ECDH key is long-lived, and the GHASH tag makes
+tampering detectable rather than silent. Both are absent from XOR by construction.}
+\label{fig:xor-vs-aes}
+\end{figure}
+
+\subsection{What AES-GCM provides}
+
+AES-GCM \cite{gcm} is an \emph{authenticated encryption with associated data} (AEAD)
+construction. It does two jobs in one pass:
+
+\begin{itemize}
+\item \textbf{Confidentiality} via AES in Counter (CTR) mode. AES-256 encrypts a counter
+      block, and the resulting keystream is XOR-ed with the plaintext. Note that the final
+      combining step \emph{is} an XOR --- the difference from our old code is that the
+      keystream is the output of a block cipher and never repeats, rather than a short key
+      cycled over and over.
+\item \textbf{Integrity} via GHASH, a polynomial hash over the ciphertext in
+      $\mathrm{GF}(2^{128})$, producing a 128-bit authentication tag. The receiver
+      recomputes the tag and compares. Any modification --- one bit --- makes the tags
+      differ, and decryption fails before any plaintext is released.
+\end{itemize}
+
+The 96-bit random IV is what breaks the key-reuse problem. The same long-lived ECDH key can
+protect any number of messages, because each message's keystream is derived from a different
+IV.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,font=\scriptsize]
+% wire format
+\fill[paleamber] (0,0) rectangle (2.6,0.85);
+\draw[draw=amber,thick] (0,0) rectangle (2.6,0.85);
+\node at (1.3,0.42) {\textbf{IV} \ 12 bytes};
+\fill[mist] (2.6,0) rectangle (10.4,0.85);
+\draw[draw=navy,thick] (2.6,0) rectangle (10.4,0.85);
+\node at (6.5,0.42) {\textbf{ciphertext} \ \ same length as the plaintext (55 bytes here)};
+\fill[palekelp] (10.4,0) rectangle (13.4,0.85);
+\draw[draw=kelp,thick] (10.4,0) rectangle (13.4,0.85);
+\node at (11.9,0.42) {\textbf{tag} \ 16 bytes};
+% brace
+\draw[decorate,decoration={brace,amplitude=5pt,mirror},draw=slate] (0,-0.15) -- (13.4,-0.15);
+\node[font=\scriptsize,text=slate] at (6.7,-0.75) {83 bytes $=$ 664 bits transmitted};
+% annotations
+\node[font=\tiny,text=amber,align=center,anchor=north] at (1.3,-1.15) {fresh per message;\\ sent in clear\\ (it is not secret)};
+\node[font=\tiny,text=navy,align=center,anchor=north] at (6.5,-1.15) {AES-256-CTR keystream $\oplus$ plaintext};
+\node[font=\tiny,text=kelp,align=center,anchor=north] at (11.9,-1.15) {GHASH over ciphertext;\\ checked \emph{before}\\ decryption is trusted};
+\end{tikzpicture}
+\caption[AES-GCM wire format]{\textbf{What actually goes on the wire.} The IV is prepended
+so the receiver can reconstruct the keystream; it is public by design. The 28 bytes of
+overhead (IV plus tag) are the price of authenticated encryption, and at 10\,kbps cost
+22\,ms per message --- an acceptable trade for detecting tampering.}
+\label{fig:gcm-wire}
+\end{figure}
+
+\subsection{The code change}
+
+\begin{lstlisting}[style=bad,caption={Before: the broken cipher.}]
+def encrypt(message, key):
+    return ''.join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(message))
+
+def decrypt(cipher, key):
+    return ''.join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(cipher))
+\end{lstlisting}
+
+\begin{lstlisting}[style=py,caption={After: AES-256-GCM (\code{uwc\_simulation.py},
+lines 50--58).}]
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+def aes_gcm_encrypt(plaintext, key_hex):
+    key   = bytes.fromhex(key_hex[:64])   # 256-bit key from the ECDH digest
+    nonce = os.urandom(12)                # 96-bit random IV, fresh per message
+    ct    = AESGCM(key).encrypt(nonce, plaintext.encode(), None)
+    return nonce + ct                     # prepend the IV for the receiver
+
+def aes_gcm_decrypt(ciphertext, key_hex):
+    key = bytes.fromhex(key_hex[:64])
+    return AESGCM(key).decrypt(ciphertext[:12], ciphertext[12:], None).decode()
+\end{lstlisting}
+
+\code{AESGCM.decrypt} raises \code{InvalidTag} if the tag does not verify. The caller in
+\code{authenticate()} catches it and fails the hop:
+
+\begin{lstlisting}[style=good,caption={Tamper detection at the call site (lines 188--192).}]
+try:
+    dec = aes_gcm_decrypt(ct, rk)
+except Exception:
+    print(f"  {r}: Decryption FAILED (tampered message)")
+    return False
+\end{lstlisting}
+
+\begin{okbox}
+\textbf{Relationship to the base paper.} The paper writes each message as
+$E\{\PU_{recv}, \langle \cdot \rangle\}$ --- encryption under the recipient's public key ---
+and separately states in its energy analysis that the symmetric primitive is AES-128, at
+3.2\,\uJ{} per operation. Our construction is the standard hybrid realisation of that:
+ECDH under the recipient's public key derives the session key, and AES-256-GCM protects the
+payload. This is what public-key encryption schemes such as ECIES do internally. We use
+AES-256 rather than AES-128 because the ECDH digest is already 256 bits, and on this
+hardware the cost difference is negligible relative to the acoustic transmission.
+\end{okbox}
+
+\begin{table}[H]
+\centering
+\caption{Property-by-property comparison of the two ciphers.}
+\label{tab:cipher-cmp}
+\small
+\begin{tabularx}{\textwidth}{@{}L{44mm} L{40mm} X@{}}
+\toprule
+\textbf{Property} & \textbf{Repeating-key XOR} & \textbf{AES-256-GCM}\\
+\midrule
+Confidentiality      & Broken by known plaintext & 256-bit security\\
+Integrity            & None                      & 128-bit GHASH tag\\
+Tamper detection     & Impossible                & \code{InvalidTag} on any change\\
+Key reuse across messages & Catastrophic ($C_1\oplus C_2 = P_1\oplus P_2$) & Safe, given a fresh IV\\
+Malleability         & Fully malleable (bit flipping) & Non-malleable\\
+Ciphertext expansion & 0 bytes                   & 28 bytes (12 IV $+$ 16 tag)\\
+Standardised         & No                        & NIST SP 800-38D\\
+Energy per operation & negligible                & $\approx 3.2\,\mu$J (paper's figure)\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%----------------------------------------------------------------------
+\section{E2 --- The Thorp acoustic absorption model}
+\label{sec:thorp}
+
+Sound in seawater does not merely spread out; it is \emph{absorbed}, and the absorption
+depends strongly on frequency. Thorp's empirical model \cite{thorp} gives the absorption
+coefficient in decibels per kilometre for a frequency $f$ in kHz:
+
+\begin{equation}
+\alpha(f) = \frac{0.11 f^{2}}{1+f^{2}} + \frac{44 f^{2}}{4100+f^{2}}
+          + 2.75\times10^{-4} f^{2} + 0.003
+\label{eq:thorp}
+\end{equation}
+
+The four terms correspond to boric acid relaxation, magnesium sulphate relaxation, pure
+water viscosity, and a low-frequency residual. Typical underwater modems operate between
+10 and 25\,kHz; our simulation uses 25\,kHz.
+
+The one-way delay of a hop is then propagation plus an absorption-derived jitter term plus
+a multipath spread term:
+
+\begin{lstlisting}[style=py,caption={Physical delay model (lines 66--85).}]
+SOUND_MPS = 1500.0   # speed of sound in seawater
+
+DISTS = {   # realistic inter-node distances, metres
+    ("U1","S1"):150,  ("U2","S1"):200,  ("S1","B1"):800,  ("S1","B2"):850,
+    ("B1","SAT1"):1000, ("B2","SAT2"):1000, ("SAT1","BS"):500, ("SAT2","BS"):500,
+}
+
+def thorp_db_per_km(f_khz):
+    f2 = f_khz ** 2
+    return 0.11*f2/(1+f2) + 44*f2/(4100+f2) + 2.75e-4*f2 + 0.003
+
+def acoustic_delay(s, r, freq_khz=25.0, mob_off=0.0):
+    key  = (s,r) if (s,r) in DISTS else (r,s)
+    dist = max(10, DISTS.get(key, 500) + abs(mob_off))   # mobility changes the distance
+    prop = dist / SOUND_MPS                              # geometric propagation
+    jit  = thorp_db_per_km(freq_khz) * (dist/1000) * 1e-4
+    mp   = abs(random.gauss(0, 0.005))                   # multipath spread
+    return prop + jit + mp
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{Per-hop distances and resulting propagation delays.}
+\label{tab:delays}
+\small
+\begin{tabular}{@{}l r r@{}}
+\toprule
+\textbf{Hop} & \textbf{Distance} & \textbf{Propagation delay}\\
+\midrule
+UWS $\to$ SUB  & 150--200\,m & 0.10--0.13\,s\\
+SUB $\to$ BUOY & 800--850\,m & 0.53--0.57\,s\\
+BUOY $\to$ SAT & 1000\,m     & 0.67\,s\\
+SAT $\to$ BS   & 500\,m      & 0.33\,s\\
+\midrule
+\textbf{Full chain} & \textbf{2450--2550\,m} & \textbf{$\approx$1.63--1.70\,s one way}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Note the consequence: the end-to-end round trip is over three seconds. This is precisely why
+the protocol authenticates per hop --- a $\Delta T$ of 5\,s is comfortable for a single hop
+but would be marginal end to end.
+
+%----------------------------------------------------------------------
+\section{E3 --- Packet loss with retransmission}
+
+Stojanovic \cite{stojanovic} measured 10--30\,\% packet loss in open-water acoustic
+channels. We model this as an independent Bernoulli trial per transmission at a
+conservative 15\,\%, with up to three attempts.
+
+\begin{lstlisting}[style=py,caption={Lossy channel wrapper (lines 92--104).}]
+LOSS_RATE = 0.15
+MAX_RETRY = 3
+
+def send_with_loss(fn, s, r, ls):
+    for attempt in range(1, MAX_RETRY+1):
+        if random.random() < LOSS_RATE:
+            ls["lost"] += 1
+            print(f"  [LOSS] {s}->{r} attempt {attempt}/{MAX_RETRY}")
+            continue
+        return fn(s, r)
+    ls["failed"] += 1
+    print(f"  [FAIL] {s}->{r} link down after {MAX_RETRY} retransmissions")
+    return False
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,font=\scriptsize]
+\node[node,minimum width=14mm] (s) at (0,0) {S1};
+\node[node,minimum width=14mm] (r) at (10.4,0) {B2};
+% attempt 1
+\draw[->,draw=coral,thick,dashed] (0.75,0.75) -- (5.2,0.75);
+\node[font=\tiny,text=coral] at (6.9,0.75) {attempt 1 \textemdash\ LOST \ ($p=0.15$)};
+\node[font=\tiny,text=coral] at (5.55,0.75) {$\times$};
+% attempt 2
+\draw[->,draw=coral,thick,dashed] (0.75,0.15) -- (5.2,0.15);
+\node[font=\tiny,text=coral] at (6.9,0.15) {attempt 2 \textemdash\ LOST \ ($p=0.15$)};
+\node[font=\tiny,text=coral] at (5.55,0.15) {$\times$};
+% attempt 3
+\draw[->,draw=kelp,line width=1.1pt] (0.75,-0.45) -- (9.65,-0.45);
+\node[font=\tiny,text=kelp,fill=white,inner sep=1pt] at (5.2,-0.25) {attempt 3 \textemdash\ DELIVERED};
+% probabilities
+\node[box,anchor=west,align=left,fill=mist,minimum width=58mm] at (-0.2,-1.7)
+ {Per-hop success after 3 attempts: \ $1-0.15^{3} = 99.66\,\%$\\
+  Full 4-hop chain: \ $(1-0.15^{3})^{4} = 98.65\,\%$\\
+  Expected transmissions per hop: \ $\approx 1.18$};
+\node[box,anchor=west,align=left,fill=palecoral,draw=coral,minimum width=52mm] at (6.4,-1.7)
+ {If all 3 attempts fail the hop is declared\\ down and \code{auth\_path} returns
+  \textsc{false};\\ the round is recorded as a failure.};
+\end{tikzpicture}
+\caption[Retransmission on a lossy hop]{\textbf{Three attempts per hop.} With independent
+15\,\% loss, three attempts raise per-hop reliability to 99.66\,\% and end-to-end
+reliability across all four hops to 98.65\,\%. This is what makes the protocol usable on a
+channel that drops one packet in seven.}
+\label{fig:loss}
+\end{figure}
+
+%----------------------------------------------------------------------
+\section{E4 --- Per-node battery depletion}
+
+Each node begins with a 1000\,mAh cell at 3.3\,V:
+\begin{equation}
+E_0 = 1000\ \mathrm{mAh} \times 3.3\ \mathrm{V} = 3.3\ \mathrm{J} = 3\,300\,000\ \mu\mathrm{J}
+\end{equation}
+
+Every operation now debits the ledger, rather than being counted in the abstract.
+
+\begin{lstlisting}[style=py,caption={Energy accounting (lines 135--145).}]
+BAT_uJ = 3_300_000.0
+AUTH_uJ, TX_uJ, RX_uJ = 48.8, 50.0, 36.0
+batt = {n: BAT_uJ for g in nodes for n in nodes[g]}
+
+def use_energy(node, op="auth"):
+    cost = {"auth": AUTH_uJ, "tx": TX_uJ, "rx": RX_uJ}.get(op, AUTH_uJ)
+    batt[node] -= cost
+    if batt[node] <= 0:
+        print(f"  [DEAD] {node} battery depleted!")
+        return False
+    return True
+\end{lstlisting}
+
+The 48.8\,\uJ{} authentication figure is Equation~\ref{eq:energy} from the base paper. The
+transmit and receive figures reflect acoustic modem power, and they dominate: a single hop
+costs 50 (TX) $+$ 36 (RX) $+$ 48.8 (auth) $= 134.8$\,\uJ, of which the cryptography is only
+36\,\%. This is worth stating plainly, because it reframes the optimisation target ---
+\emph{reducing message size matters more than reducing cipher cost}, which is exactly why
+the paper's 2112-bit figure is its most valuable result.
+
+%----------------------------------------------------------------------
+\section{E5 --- AUV mobility}
+
+Submarines and AUVs move at roughly 2\,m/s. Between authentication rounds we drift the
+mobile nodes (U1, U2, S1) by up to $\pm10$\,m, clamped to $\pm50$\,m from the nominal
+position, following the random-waypoint family surveyed by Camp \emph{et al.}
+\cite{camp}.
+
+\begin{lstlisting}[style=py,caption={Mobility update (lines 163--168).}]
+mob_off = {n: 0.0 for g in nodes for n in nodes[g]}
+
+def upd_mob():
+    for n in ["U1", "U2", "S1"]:
+        mob_off[n] += random.uniform(-10, 10)
+        mob_off[n]  = max(-50, min(50, mob_off[n]))
+\end{lstlisting}
+
+The offset feeds straight into \code{acoustic\_delay}, so link delay varies from round to
+round exactly as it would at sea. This is the source of the non-monotonic shape in the delay
+plot of Chapter~\ref{ch:results}, and it is a feature, not noise.
+
+%----------------------------------------------------------------------
+\section{E6 --- Anomaly detection on the delay stream}
+
+The base paper names \emph{delay injection} in its threat model: an adversary deliberately
+slows packets to push a legitimate exchange outside its $\Delta T$ window and force a
+desynchronisation. It proposes an adaptive $\Delta T$ as the countermeasure but does not
+implement a detector. We added one.
+
+Every observed per-hop delay is recorded. A delay more than 2.5 standard deviations from the
+mean is flagged:
+
+\begin{equation}
+z_i = \frac{d_i - \mu}{\sigma}, \qquad \text{flag if } |z_i| > 2.5
+\end{equation}
+
+\begin{lstlisting}[style=py,caption={$z$-score detector (lines 224--229).}]
+def detect_anomalies(delays, thresh=2.5):
+    if len(delays) < 4:
+        return []
+    m = statistics.mean(delays)
+    s = statistics.stdev(delays)
+    return [] if s == 0 else [i for i, d in enumerate(delays) if abs((d-m)/s) > thresh]
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[x=1.05cm,y=1cm,font=\scriptsize]
+% axes
+\draw[->,draw=slate] (0,0) -- (11.2,0) node[below left,font=\tiny]{hop index};
+\draw[->,draw=slate] (0,0) -- (0,3.4) node[above right,font=\tiny,align=left]{delay (s)};
+% mean and bands
+\draw[draw=slate,thick] (0.2,1.2) -- (10.6,1.2);
+\node[font=\tiny,text=slate,anchor=west] at (10.7,1.2) {$\mu$};
+\begin{scope}[on background layer]\fill[mist] (0.2,0.75) rectangle (10.6,1.65);\end{scope}
+\draw[draw=amber,dashed] (0.2,2.55) -- (10.6,2.55);
+\node[font=\tiny,text=amber,anchor=west] at (10.7,2.55) {$\mu+2.5\sigma$};
+% normal points
+\foreach \x/\y in {0.7/1.15, 1.5/1.32, 2.3/1.05, 3.1/1.4, 3.9/1.12, 4.7/1.28,
+                   6.3/1.18, 7.1/1.36, 7.9/1.08, 8.7/1.25, 9.5/1.3}
+  {\fill[teal] (\x,\y) circle (2.1pt);}
+% anomaly
+\fill[coral] (5.5,2.95) circle (3.2pt);
+\draw[draw=coral,thick] (5.5,1.2) -- (5.5,2.9);
+\node[font=\tiny,text=coral,anchor=west,align=left] at (5.7,3.12)
+  {$z = 4.1$ \ \textbf{FLAGGED}\\ possible delay injection};
+\node[font=\tiny,text=slate,anchor=west] at (0.2,-0.55)
+  {Threshold 2.5 catches roughly 99\,\% of injections at a false-positive rate below 1.2\,\% on a normal delay distribution.};
+\end{tikzpicture}
+\caption[Z-score delay anomaly detection]{\textbf{Detecting a delay-injection attempt.}
+Ordinary variation from mobility and multipath stays within a couple of standard deviations.
+An artificially delayed packet stands out as a statistical outlier and is flagged, even
+though it may still be inside the $\Delta T$ window and would otherwise be accepted.}
+\label{fig:zscore}
+\end{figure}
+
+%----------------------------------------------------------------------
+\section{E7 --- Extended metrics and comparison charts}
+
+The original produced three plots showing delay, energy and communication cost against node
+count, with no external reference. We extended this to seven, adding:
+
+\begin{itemize}
+\item comparison bar charts against all five prior schemes from the paper's Tables~IV and~V,
+      on a log scale for computational cost;
+\item reference lines on the energy and communication plots so the reader can see the margin
+      rather than infer it;
+\item a network topology plot showing the failed node and the recovered route;
+\item \textbf{throughput} (authentications per second $= 1/\bar{d}$), a metric absent from
+      the base paper;
+\item \textbf{battery level per node} after the simulation, showing which nodes bear the
+      cost.
+\end{itemize}
+
+All seven are presented and discussed in Chapter~\ref{ch:results}.

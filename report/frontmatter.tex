@@ -1,0 +1,96 @@
+%======================================================================
+%  Front matter: title page, certificate, declaration, abstract, ToC
+%======================================================================
+\begin{titlepage}
+\centering
+\thispagestyle{empty}
+
+{\color{navy}\rule{\textwidth}{1.6pt}}\\[2pt]
+{\color{teal}\rule{\textwidth}{0.6pt}}\\[16mm]
+
+{\sffamily\bfseries\LARGE\color{navy}
+Channel Aware Authentication Protocol\\[4pt]
+for Secure Underwater Communication Systems\\}
+\vspace{7mm}
+{\sffamily\Large\color{slate} Overview of Previous Work\\[2pt]
+and Current Upgrades}\\[16mm]
+
+\end{titlepage}
+
+%----------------------------------------------------------------------
+
+
+%----------------------------------------------------------------------
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+\thispagestyle{plain}
+
+\noindent
+Underwater wireless communication networks carry environmental monitoring, offshore
+exploration and naval surveillance traffic, yet they cannot use any of the security
+machinery that terrestrial networks rely on. Radio does not propagate in seawater, so these
+networks talk in sound: about 1500\,m/s, roughly 10\,kbps of usable bandwidth, 10--30\,\%
+packet loss, and battery-powered nodes that nobody can service. A TLS handshake on such a
+link would take tens of seconds and a measurable fraction of a node's lifetime energy.
+
+\vspace{2mm}\noindent
+This report studies the authentication protocol proposed by Rupa \emph{et al.} in the
+\emph{IEEE Internet of Things Journal} (Nov.\ 2025), which is designed specifically for that
+regime. The protocol arranges the network as a five-layer chain --- underwater sensor,
+submarine, buoy, satellite, base station --- and authenticates \emph{each hop
+independently} using elliptic-curve public-key encryption, a fresh nonce and a bounded
+timestamp window, completing the seabed-to-shore chain in twelve messages and 2112 bits.
+It adds dynamic fallback peers so that a failed buoy does not tear down the session, and it
+is validated with BAN logic and the Scyther model checker.
+
+\vspace{2mm}\noindent
+We reproduce the protocol as an eight-node Python simulator, then strengthen it in seven
+places where our own first version was unrealistic or unsafe. The most consequential change
+is cryptographic: our initial build used a hand-written repeating-key XOR cipher, which is
+broken by a known-plaintext or key-reuse attack in seconds; we replaced it with
+\textbf{AES-256-GCM} authenticated encryption, giving both confidentiality and a 128-bit
+integrity tag that makes ciphertext tampering detectable. The remaining six enhancements
+replace invented numbers with physics: Thorp acoustic absorption for delay, a 15\,\%
+Bernoulli loss channel with retransmission, per-node battery depletion, random-waypoint
+mobility for AUVs, a $z$-score detector for delay-injection attacks, and an extended set of
+result plots benchmarked against five prior schemes.
+
+\vspace{2mm}\noindent
+Separately, we rewrote the Scyther specification. Our first model expressed the chain as one
+monolithic five-role protocol and failed several agreement claims; restructuring it into
+four independent Needham--Schroeder--Lowe hops, with message tags and the responder identity
+inside the second message, produced \textbf{32 of 32 claims verified with no attacks} under
+a Dolev--Yao adversary in 0.19\,s. The final system authenticates a hop in 0.4\,ms of
+computation at 48.8\,\uJ{} per cycle, sustains authentication across a lossy channel, and
+reroutes automatically when a buoy fails.
+
+\vspace{4mm}\noindent
+\textbf{Keywords:} underwater acoustic networks, mutual authentication, elliptic curve
+cryptography, ECDH, AES-GCM, Scyther, BAN logic, Thorp absorption, replay resistance.
+
+%----------------------------------------------------------------------
+\chapter*{Acknowledgement}
+\addcontentsline{toc}{chapter}{Acknowledgement}
+\thispagestyle{plain}
+
+\noindent
+We thank \textbf{Prof.\ Mahendra Shukla}, Department of Information and Communication
+Technology, ABV-IIITM Gwalior, for supervising this work. His insistence that we justify
+every number in the simulation --- rather than accept a plausible-looking constant --- is
+directly responsible for the channel model in Chapter~6 being physical instead of arbitrary.
+
+\vspace{2mm}\noindent
+We are grateful to the authors of the base paper for a clearly specified protocol, and to
+Prof.\ Cas Cremers and the Scyther project for making rigorous protocol verification
+accessible to undergraduates. Finally, we thank the Institute for access to the IEEE Xplore
+digital library, without which the base paper would have been out of reach.
+
+%----------------------------------------------------------------------
+\cleardoublepage
+\pdfbookmark[0]{Contents}{toc}
+\tableofcontents
+\listoffigures
+\addcontentsline{toc}{chapter}{List of Figures}
+\listoftables
+\addcontentsline{toc}{chapter}{List of Tables}
+\cleardoublepage

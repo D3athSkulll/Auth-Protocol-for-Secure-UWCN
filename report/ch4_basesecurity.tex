@@ -1,0 +1,352 @@
+%======================================================================
+\chapter{Security Analysis and Performance in the Base Paper}
+\label{ch:basesec}
+%======================================================================
+
+Having set out what the protocol \emph{does}, this chapter covers the paper's argument that
+it is \emph{secure}, and its accounting of what it costs. Three separate arguments are made:
+a formal proof in BAN logic, a set of informal propositions, and machine verification with
+Scyther.
+
+\section{Threat model}
+
+The paper assumes an adversary capable of:
+
+\begin{itemize}
+\item \textbf{Passive eavesdropping} --- recording everything on the channel.
+\item \textbf{Active impersonation} --- claiming to be a legitimate node.
+\item \textbf{Replay} --- retransmitting captured messages.
+\item \textbf{Delay injection} --- deliberately slowing packets to push a legitimate
+      exchange outside its timestamp window, causing desynchronisation.
+\item \textbf{Physical tampering} --- compromising a subset of nodes and extracting their
+      stored credentials.
+\end{itemize}
+
+The four defences claimed against these are: unique non-reusable nonces with adaptive
+timestamp validation; asymmetric encryption with secure key derivation; tamper-resistant
+storage with hierarchical credential management; and revocation combined with dynamic
+fallback paths.
+
+\section{Formal analysis with BAN logic}
+
+BAN logic \cite{ban} is a formal system for reasoning about \emph{belief} in authentication
+protocols. Rather than modelling bits, it models what each participant is entitled to
+conclude after seeing a message. It is a proof technique, not a tool: you write down what
+each party initially believes, apply inference rules to each message, and check whether the
+desired beliefs follow.
+
+\subsection{Notation}
+
+For entities $\varepsilon, \phi$ and messages $M_\varepsilon, M_\phi$:
+
+\begin{table}[H]
+\centering
+\small
+\caption{BAN logic notation used in the base paper's proof.}
+\label{tab:ban-not}
+\begin{tabularx}{\textwidth}{@{}L{30mm} X@{}}
+\toprule
+\textbf{Notation} & \textbf{Reading}\\
+\midrule
+$\prec M_\varepsilon \succ$ & Message $M_\varepsilon$ is \emph{fresh}\\
+$\varepsilon \Lleftarrow M_\varepsilon$ & $\varepsilon$ \emph{sees} the statement\\
+$\varepsilon \Rightarrow M_\varepsilon$ & $\varepsilon$ has \emph{jurisdiction} over the statement\\
+$\varepsilon \gg M_\varepsilon$ & $\varepsilon$ \emph{believes} the statement\\
+$\varepsilon \sim M_\varepsilon$ & $\varepsilon$ \emph{once said} the statement\\
+$\{M_\varepsilon\}_{\PU_\varepsilon}$ & Encrypted under $\varepsilon$'s public key\\
+$\phi \xLeftrightarrow{\PU_\varepsilon} \varepsilon$ & The two communicate securely using $\PU_\varepsilon$\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Inference rules}
+
+\begin{table}[H]
+\centering
+\small
+\caption{The five BAN rules applied in the proof.}
+\label{tab:ban-rules}
+\begin{tabularx}{\textwidth}{@{}L{10mm} L{40mm} X@{}}
+\toprule
+& \textbf{Rule} & \textbf{Plain reading}\\
+\midrule
+R1 & Message-meaning &
+  If I believe we share a key and I see a message encrypted under it, then I believe you
+  sent that message.\\
+R2 & Nonce-verification &
+  If I believe the message is fresh and that you sent it, then I believe you currently
+  believe it (not that you said it long ago).\\
+R3 & Jurisdiction &
+  If I believe you are authoritative over a statement and that you believe it, then I
+  believe it.\\
+R4 & Freshness &
+  If any part of a message is fresh, the whole message is fresh.\\
+R5 & Belief &
+  If I believe you believe a compound message, I believe you believe each part.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Goals, assumptions and the derivation}
+
+Eight goals are stated, one per direction of each of the four hops:
+\begin{align}
+\Omega_1&: \mathrm{UWS} \gg (\mathrm{UWS} \xLeftrightarrow{\PU_{SUB}} \mathrm{SUB}) &
+\Omega_2&: \mathrm{SUB} \gg (\mathrm{UWS} \xLeftrightarrow{\PU_{UWS}} \mathrm{SUB}) \notag\\
+\Omega_3&: \mathrm{SUB} \gg (\mathrm{SUB} \xLeftrightarrow{\PU_{B}} \mathrm{B}) &
+\Omega_4&: \mathrm{B} \gg (\mathrm{SUB} \xLeftrightarrow{\PU_{SUB}} \mathrm{B}) \notag\\
+\Omega_5&: \mathrm{B} \gg (\mathrm{B} \xLeftrightarrow{\PU_{SAT}} \mathrm{SAT}) &
+\Omega_6&: \mathrm{SAT} \gg (\mathrm{B} \xLeftrightarrow{\PU_{B}} \mathrm{SAT}) \notag\\
+\Omega_7&: \mathrm{SAT} \gg (\mathrm{SAT} \xLeftrightarrow{\PU_{BS}} \mathrm{BS}) &
+\Omega_8&: \mathrm{BS} \gg (\mathrm{SAT} \xLeftrightarrow{\PU_{SAT}} \mathrm{BS}) \notag
+\end{align}
+
+The initial assumptions are that every entity believes its own nonces and timestamps are
+fresh ($A_1, A_2$), that each entity has jurisdiction over its own identity ($A_3$), and
+that public keys are correctly distributed ($A_4$).
+
+The derivation then runs for thirty steps. Figure~\ref{fig:ban} shows the first hop, which
+is representative --- the other three hops repeat the identical five-step shape.
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[x=1cm,y=1cm,font=\footnotesize]
+\node[box,anchor=west,align=left,minimum width=68mm,fill=mist] (s1) at (0,0)
+ {\textbf{s1} \ \ $\mathrm{SUB} \Lleftarrow \langle \ID_{UWS}\cat\Nonce_{UWS}\cat\TS_1\rangle_{\PU_{SUB}}$\\
+  \textit{\scriptsize SUB sees the encrypted challenge \textemdash\ direct from $M_1$}};
+\node[box,anchor=west,align=left,minimum width=68mm,fill=mist] (s2) at (0,-1.5)
+ {\textbf{s2} \ \ $\mathrm{SUB} \gg (\mathrm{UWS} \sim \langle \ID_{UWS}\cat\Nonce_{UWS}\rangle)$\\
+  \textit{\scriptsize by R1 + A4: only UWS could have produced it}};
+\node[box,anchor=west,align=left,minimum width=68mm,fill=mist] (s3) at (0,-3.0)
+ {\textbf{s3} \ \ $\mathrm{SUB} \gg \prec \ID_{UWS}\cat\Nonce_{UWS} \succ$\\
+  \textit{\scriptsize by R4 + A1: the nonce is fresh, so the whole message is}};
+\node[box,anchor=west,align=left,minimum width=68mm,fill=mist] (s4) at (0,-4.5)
+ {\textbf{s4} \ \ $\mathrm{SUB} \gg \mathrm{UWS} \gg \langle \ID_{UWS}\cat\Nonce_{UWS}\rangle$\\
+  \textit{\scriptsize by R2 on s2 and s3: UWS believes it \emph{now}, not historically}};
+\node[box,anchor=west,align=left,minimum width=68mm,fill=palekelp,draw=kelp] (s5) at (0,-6.0)
+ {\textbf{s5} \ \ $\mathrm{SUB} \gg (\mathrm{UWS} \xLeftrightarrow{\PU_{UWS}} \mathrm{SUB})$
+  \ \ \textcolor{kelp}{\textbf{GOAL $\Omega_2$}}\\
+  \textit{\scriptsize by R3 + A3: jurisdiction over its own identity closes the argument}};
+\foreach \a/\b in {s1/s2,s2/s3,s3/s4,s4/s5} \draw[flow] (\a.south) -- (\b.north);
+% right column: the mirror direction
+\node[box,anchor=west,align=left,minimum width=68mm,fill=mist] (t1) at (8.2,-1.5)
+ {\textbf{s6} \ \ $\mathrm{UWS} \Lleftarrow \langle \ID_{SUB}\cat\Nonce_{UWS}\cat\TS_2\rangle_{\PU_{UWS}}$\\
+  \textit{\scriptsize UWS sees the acknowledgement \textemdash\ from $M_2$}};
+\node[box,anchor=west,align=left,minimum width=68mm,fill=mist] (t2) at (8.2,-3.0)
+ {\textbf{s7} \ \ $\mathrm{UWS} \gg (\mathrm{SUB} \sim \langle \ID_{SUB}\cat\Nonce_{UWS}\rangle)$\\
+  \textit{\scriptsize by R1 + A4}};
+\node[box,anchor=west,align=left,minimum width=68mm,fill=mist] (t3) at (8.2,-4.5)
+ {\textbf{s8} \ \ $\mathrm{UWS} \gg \mathrm{SUB} \gg \langle \ID_{SUB}\cat\Nonce_{UWS}\rangle$\\
+  \textit{\scriptsize by R2 \textemdash\ the echoed nonce is what proves liveness}};
+\node[box,anchor=west,align=left,minimum width=68mm,fill=palekelp,draw=kelp] (t4) at (8.2,-6.0)
+ {\textbf{s9} \ \ $\mathrm{UWS} \gg (\mathrm{UWS} \xLeftrightarrow{\PU_{SUB}} \mathrm{SUB})$
+  \ \ \textcolor{kelp}{\textbf{GOAL $\Omega_1$}}\\
+  \textit{\scriptsize by R3 + A3}};
+\foreach \a/\b in {t1/t2,t2/t3,t3/t4} \draw[flow] (\a.south) -- (\b.north);
+\node[font=\scriptsize\bfseries\sffamily,text=navy,anchor=west] at (0,0.95)
+  {DIRECTION 1: SUB authenticates UWS \ (from $M_1$)};
+\node[font=\scriptsize\bfseries\sffamily,text=navy,anchor=west] at (8.2,-0.55)
+  {DIRECTION 2: UWS authenticates SUB \ (from $M_2$)};
+\node[box,anchor=west,fill=paleamber,draw=amber,align=left,minimum width=150mm,font=\scriptsize] at (0,-7.4)
+ {Both goals reached $\Rightarrow$ \textbf{mutual} authentication on hop 1. Steps s10--s30
+  repeat this identical shape for SUB$\leftrightarrow$B ($\Omega_3,\Omega_4$),
+  B$\leftrightarrow$SAT ($\Omega_5,\Omega_6$) and SAT$\leftrightarrow$BS ($\Omega_7,\Omega_8$).};
+\end{tikzpicture}}
+\caption[BAN logic derivation for hop 1]{\textbf{The BAN derivation, hop 1.} The left column
+is the challenge direction, the right the acknowledgement direction. Reaching both goals is
+what makes the authentication \emph{mutual}. The critical step is s4/s8, where the freshness
+of the nonce upgrades ``$\phi$ once said this'' into ``$\phi$ believes this now'' ---
+without freshness, a replayed message would satisfy the earlier steps.}
+\label{fig:ban}
+\end{figure}
+
+\section{Informal security propositions}
+\label{sec:informal}
+
+The paper supplements the BAN proof with five propositions.
+
+\begin{table}[H]
+\centering
+\caption{The paper's five security propositions and the mechanism behind each.}
+\label{tab:props}
+\small
+\begin{tabularx}{\textwidth}{@{}L{8mm} L{34mm} X@{}}
+\toprule
+& \textbf{Claim} & \textbf{Mechanism}\\
+\midrule
+P1 & No identity spoofing &
+  Each identity is bound to a key pair and validated by signature at registration;
+  $\mathrm{Verify}(\mathrm{Sig}(\ID_i,\mathrm{SK}_i),\mathrm{PK}_i)$ must return true.
+  Forging an identity means forging a signature.\\
+\addlinespace[2pt]
+P2 & Replay resistance &
+  The receiver checks $N_i \notin \mathrm{UsedNonces}$ \emph{and}
+  $|\mathrm{now}-\TS_i| \le \Delta T$. The paper further proposes an \emph{adaptive}
+  $\Delta T$: each node keeps a rolling average of recent inter-node delays and adjusts the
+  window, so legitimate variation is tolerated while stale injection is still caught.\\
+\addlinespace[2pt]
+P3 & No man-in-the-middle &
+  Messages are encrypted under the recipient's public key. Only the holder of the matching
+  private key can decrypt or meaningfully alter them.\\
+\addlinespace[2pt]
+P4 & Secure key establishment &
+  $K_{ij} = \mathrm{DH}(\mathrm{PK}_i,\mathrm{SK}_j) = \mathrm{DH}(\mathrm{PK}_j,\mathrm{SK}_i)$.
+  Only the two legitimate parties can compute it. Bounded $\Delta T$ per hop additionally
+  causes a delay-injection attempt to abort the session.\\
+\addlinespace[2pt]
+P5 & Resists stolen-verifier and ephemeral-secret-leakage attacks &
+  Long-term private keys authenticate session establishment only; session keys are
+  ephemeral, derived from fresh nonces and timestamps, and never stored. Compromising a node
+  therefore yields neither past nor future session keys --- this is forward secrecy in
+  effect. The registration set is periodically checked against the BS's revocation list.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Machine verification with Scyther}
+
+Scyther \cite{scyther} is an automated model checker for security protocols developed by
+Cas Cremers. You describe the protocol in SPDL (Security Protocol Description Language),
+state the properties you want, and the tool searches exhaustively for a trace in which a
+Dolev--Yao adversary violates one. If no such trace exists within the bound, it reports a
+proof of correctness; if one does, it draws the attack.
+
+The four properties checked are:
+
+\begin{table}[H]
+\centering
+\caption{Scyther claim types and what each rules out.}
+\label{tab:claims}
+\small
+\begin{tabularx}{\textwidth}{@{}L{24mm} X L{42mm}@{}}
+\toprule
+\textbf{Claim} & \textbf{Guarantee} & \textbf{Attack it rules out}\\
+\midrule
+\texttt{Secret} & The named value is never learned by the adversary:
+  $\forall \mathcal{A},\ \Pr[\mathcal{A}(S)=S] \le \theta$ &
+  Eavesdropping, key recovery\\
+\texttt{Alive} & The claimed peer actually executed the protocol &
+  Talking to a ghost\\
+\texttt{Weakagree} & If $\varepsilon_A$ believes it ran with $\varepsilon_B$, then
+  $\varepsilon_B$ really did run with $\varepsilon_A$:
+  $P(\varepsilon_A,\varepsilon_B) \Rightarrow \exists P(\varepsilon_B,\varepsilon_A)$ &
+  Man-in-the-middle, impersonation\\
+\texttt{Niagree} / \texttt{Nisynch} & Both parties agree on all exchanged values, in a
+  causally ordered sequence: a message received at $t_r$ was sent at $t_s \le t_r$ &
+  Replay, message reordering, value substitution\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The paper reports that all entities passed, configured for five roles with up to five
+concurrent sessions each, across more than sixty test cases, with no attacks found. Its
+Fig.~6 shows the tool output. The paper does not publish its SPDL source; our own
+reconstruction, and the restructuring it needed, is the subject of Chapter~\ref{ch:scyther}.
+
+\section{Performance in the base paper}
+
+\subsection{Experimental setup}
+
+The paper's evaluation uses a custom Python 3.10 simulator on Ubuntu 22.04, Intel Core
+i7-11800H, 32\,GB RAM. The modelled network is a hierarchical tree of 10 to 200 nodes over 2
+to 5 depth levels, with acoustic links at a nominal 10\,kbps, inter-node distances of 100 to
+1000\,m and sound speed 1500\,m/s. Message fields are standardised at 64-bit identities,
+64-bit nonces, 8-bit timestamps, 160-bit hashes and 512-bit ECC-point or AES-key
+representations.
+
+\subsection{Communication cost}
+
+\begin{table}[H]
+\centering
+\caption[Communication cost comparison]{Communication cost per full authentication cycle,
+in bits (base paper, Table~IV). ``Ref [21]--[25]'' are the scheme identifiers used in the
+base paper's own comparison, and are \emph{not} the reference numbers of this report.}
+\label{tab:comm}
+\small
+\begin{tabular}{@{}l r r r r r l@{}}
+\toprule
+\textbf{Protocol} & \textbf{Entity 1} & \textbf{Entity 2} & \textbf{Entity 3} &
+\textbf{Entity 4} & \textbf{Total} & \textbf{vs proposed}\\
+\midrule
+Ref [21] & 896  & 768 & 512 & 832 & 3008 & $+42\,\%$\\
+Ref [22] & 1024 & 832 & 512 & 832 & 3200 & $+52\,\%$\\
+Ref [23] & 960  & 800 & 544 & 832 & 3136 & $+49\,\%$\\
+Ref [24] & 912  & 784 & 512 & 832 & 3040 & $+44\,\%$\\
+Ref [25] & 1008 & 848 & 528 & 832 & 3216 & $+52\,\%$\\
+\midrule
+\textbf{Proposed} & \textbf{640} & \textbf{512} & \textbf{320} & \textbf{640} &
+\textbf{2112} & \textbf{baseline}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The percentages are relative to the proposed scheme as denominator; for example
+$(3008-2112)/2112 = 42\,\%$.
+
+\subsection{Computational cost}
+
+\begin{table}[H]
+\centering
+\caption[Computational cost comparison]{Computational cost per entity in milliseconds
+(base paper, Table~V). $T_{exp}$ exponentiation, $T_{ecm}$ elliptic-curve multiplication,
+$T_h$ hash, $T_{pair}$ bilinear pairing.}
+\label{tab:comp}
+\small
+\begin{tabularx}{\textwidth}{@{}l r r X@{}}
+\toprule
+\textbf{Protocol} & \textbf{UWS / BS} & \textbf{SUB / SAT} & \textbf{Operations}\\
+\midrule
+Ref [21] & 0.536  & 0.800  & 2 exp $+$ 6 hash\\
+Ref [22] & 19.70  & 25.000 & 3 ECM $+$ 4 ECM $+$ pairings\\
+Ref [23] & 75.88  & 90.000 & 3 ECM $+$ 2 pairings\\
+Ref [24] & 2.352  & 2.900  & 1 ECM $+$ 4 hash\\
+Ref [25] & 1.245  & 1.600  & 1 ECM $+$ 3 hash\\
+\midrule
+\textbf{Proposed} & \textbf{0.400} & \textbf{0.500} &
+\textbf{1 ECC $+$ 2 hash $+$ 4 AES}\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The saving comes from eliminating bilinear pairings and multiple exponentiations --- the two
+operations that dominate cost in the older schemes --- and replacing them with one optimised
+ECC operation plus cheap symmetric work. Against Ref~[23] this is a $189\times$ improvement.
+
+\subsection{Energy per authentication cycle}
+
+The paper's energy accounting uses published ARM Cortex-M4 / Cortex-A53 benchmarks:
+one ECC operation $\approx 24\,\mu$J, one hash $\approx 6\,\mu$J, one AES-128
+encryption or decryption $\approx 3.2\,\mu$J. A single entity performs one ECC operation,
+two hashes, and two encryptions plus two decryptions:
+
+\begin{equation}
+E_{cycle} = \underbrace{24}_{\text{ECC}}
+          + \underbrace{2 \times 6}_{\text{hash}}
+          + \underbrace{(2+2) \times 3.2}_{\text{AES}}
+          = 24 + 12 + 12.8 = 48.8\ \mu\mathrm{J}
+\label{eq:energy}
+\end{equation}
+
+\begin{table}[H]
+\centering
+\caption{Energy per authentication cycle against prior schemes.}
+\label{tab:energy}
+\small
+\begin{tabular}{@{}l r l@{}}
+\toprule
+\textbf{Protocol} & \textbf{Energy} & \textbf{Relative}\\
+\midrule
+Ref [22] & $\approx 2300\ \mu$J & $47\times$ more\\
+Ref [23] & $\approx 8900\ \mu$J & $182\times$ more\\
+Ref [24] & $\approx 280\ \mu$J  & $5.7\times$ more\\
+\midrule
+\textbf{Proposed} & $\bm{48.8\ \mu}$\textbf{J} & \textbf{baseline}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At 48.8\,\uJ{} --- under 0.05\,mJ --- a node with a 1000\,mAh cell at 3.3\,V
+(3.3\,J $=3.3\times10^{6}$\,\uJ) could in principle perform about 67\,000 authentication
+cycles on cryptography alone. Chapter~\ref{ch:results} shows what happens once transmission
+and reception energy are added, which is where the real budget goes.

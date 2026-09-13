@@ -1,0 +1,179 @@
+%======================================================================
+\chapter{Introduction}
+\label{ch:intro}
+%======================================================================
+
+\section{The setting}
+
+Underwater wireless communication networks (UWCNs) support environmental monitoring,
+oceanographic research, offshore oil and gas exploration, pipeline inspection and naval
+surveillance. A typical deployment scatters sensor nodes across the seabed, uses autonomous
+underwater vehicles (AUVs) or submarines as mobile collectors, floats buoys at the surface,
+and hands the data to a satellite that relays it to a base station ashore.
+
+Everything unusual about security in this setting follows from one physical fact:
+\textbf{radio waves do not propagate through seawater}. Salt water is electrically
+conductive, and a conductor absorbs electromagnetic energy; a 2.4\,GHz signal loses
+essentially all of its strength within a few centimetres. Underwater networks therefore fall
+back on the only carrier that travels usefully far in water --- \textbf{sound}.
+
+That single substitution invalidates every engineering assumption a network protocol
+normally makes. Table~\ref{tab:terr-vs-uw} contrasts the two regimes.
+
+\begin{table}[H]
+\centering
+\caption[Terrestrial versus underwater acoustic channels]%
+{The terrestrial radio channel compared with the underwater acoustic channel, and what each
+difference costs a security protocol.}
+\label{tab:terr-vs-uw}
+\small
+\begin{tabularx}{\textwidth}{@{}L{28mm} L{30mm} L{30mm} X@{}}
+\toprule
+\textbf{Property} & \textbf{Terrestrial radio} & \textbf{Underwater acoustic} &
+\textbf{Consequence for a security protocol}\\
+\midrule
+Carrier & Electromagnetic & Pressure (sound) & --- \\
+Speed & $3\times10^{8}$\,m/s & $\approx 1500$\,m/s & A 1\,km hop costs 0.67\,s one way; any
+handshake needing several round trips is unusable.\\
+Bandwidth & $100+$\,Mbps & $\approx 10$\,kbps & Every bit is expensive. A 3000-bit handshake
+needs 300\,ms just to clock out of the modem.\\
+Latency & Milliseconds & Seconds & The replay-freshness window must be seconds wide, not
+milliseconds.\\
+Packet loss & $<1\,\%$ & $10$--$30\,\%$ & Retransmission must be designed in; a protocol
+that assumes delivery will stall.\\
+Power & Mains or large battery & Small sealed cell, unserviceable & RSA and bilinear
+pairings drain a node in weeks.\\
+Topology & Largely fixed & Drifting sensors, moving AUVs, failing buoys & The protocol must
+reroute without tearing down the session.\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Problem statement}
+
+Conventional authentication --- TLS, IPsec, Kerberos as ordinarily deployed --- is not
+merely inefficient here, it is infeasible. A TLS~1.3 handshake exchanges several kilobytes
+over two round trips. At 10\,kbps a 4\,kB certificate chain alone occupies 3.2\,s of channel
+time, before adding 0.67\,s of flight per direction, and any lost fragment restarts the
+exchange. Multiply that across four hops and a single session consumes tens of seconds and
+a measurable fraction of the node's lifetime energy budget.
+
+RSA is equally unattractive: an RSA-2048 public key is 256 bytes where an elliptic-curve key
+of comparable strength is 32 bytes, and on this channel an eightfold larger key is an
+eightfold larger transmission bill. Conversely, the lightweight schemes proposed for
+underwater use often buy their efficiency by weakening security --- omitting mutual
+authentication, skipping formal verification, or failing entirely when a relay node dies.
+
+\begin{keybox}
+\textbf{The gap.} What is needed is a protocol that is simultaneously
+\emph{lightweight} enough for a battery-powered acoustic node,
+\emph{mutually authenticating} across a multi-hop relay chain,
+\emph{resilient} to the loss of an intermediate node, and
+\emph{formally verified} rather than merely argued to be secure.
+\end{keybox}
+
+\section{The base paper}
+
+This report studies the protocol proposed by C.~Rupa, G.~S.~Varshitha, D.~Divya,
+T.~R.~Gadekallu and G.~Srivastava, \emph{``A Novel and Robust Authentication Protocol for
+Secure Underwater Communication Systems''}, \emph{IEEE Internet of Things Journal},
+vol.~12, no.~22, pp.~47519--47531, November 2025 \cite{basepaper}.
+
+The paper's contributions, as stated by its authors, are:
+
+\begin{enumerate}
+\item A \textbf{pentatope-based elliptic curve cryptosystem} (PEECC) that reduces the number
+      of global parameters from six to five and raises the difficulty of the discrete
+      logarithm problem.
+\item A \textbf{mutual authentication protocol} enforcing hop-wise freshness with nonces and
+      timestamps, so replay is defeated even when propagation delay is large.
+\item \textbf{Dynamic fallback authentication peers}, allowing communication to continue
+      through a backup buoy or satellite during a partial outage.
+\item \textbf{Formal validation} using BAN logic and the Scyther model checker, reporting no
+      successful attack across more than sixty test cases.
+\item A measured \textbf{30--34\,\% reduction in communication overhead} (2112 bits against
+      3008--3216 bits for prior schemes) and sub-millisecond authentication latency.
+\item A \textbf{hierarchical key management and revocation} framework with small storage
+      cost on constrained nodes.
+\end{enumerate}
+
+\section{Objectives of this project}
+
+\begin{enumerate}
+\item Understand and set out the base protocol completely, including the cryptographic
+      background needed to follow it, so that the report is self-contained for a reader who
+      has not studied protocol security.
+\item Implement the protocol as a working simulator over a realistic eight-node underwater
+      topology, including the fallback mechanism.
+\item Specify the protocol formally in SPDL and verify it with Scyther against a
+      Dolev--Yao adversary.
+\item Identify weaknesses in our own first implementation and correct them --- in
+      particular, replace the placeholder cipher with real authenticated encryption and
+      replace invented channel numbers with a physical propagation model.
+\item Measure delay, energy, communication cost, throughput and battery depletion, and
+      compare against the five prior schemes tabulated in the base paper.
+\item State honestly where our implementation diverges from the paper.
+\end{enumerate}
+
+\section{What this report contributes beyond the paper}
+
+The base paper specifies a protocol and reports analytical costs. It does not publish an
+implementation. Our contribution is a reproducible one, summarised in
+Table~\ref{tab:contribution}.
+
+\begin{table}[H]
+\centering
+\caption{Division of work between the base paper and this project.}
+\label{tab:contribution}
+\small
+\begin{tabularx}{\textwidth}{@{}L{46mm} X@{}}
+\toprule
+\textbf{From the base paper} & \textbf{Added by this project}\\
+\midrule
+Protocol design: three phases, twelve messages, hop-wise freshness &
+Executable eight-node simulator (\code{uwc\_simulation.py}, 406 lines)\\
+\addlinespace[2pt]
+Fallback peer concept &
+Working fallback: buoy B1 is forced to fail and traffic reroutes through B2 mid-run\\
+\addlinespace[2pt]
+Claim of Scyther verification (figure only) &
+Complete published SPDL model, 4 protocols, 32 claims, reproducible in 0.19\,s\\
+\addlinespace[2pt]
+AES-128 named as the symmetric primitive &
+Actual AES-256-GCM authenticated encryption, replacing our own XOR placeholder\\
+\addlinespace[2pt]
+Delay derived from distance and sound speed &
+Thorp frequency-dependent absorption model plus multipath jitter\\
+\addlinespace[2pt]
+Loss-free analytical model &
+15\,\% Bernoulli per-hop loss with three-attempt retransmission\\
+\addlinespace[2pt]
+Static energy figure of 48.8\,\uJ{} per cycle &
+Per-node battery depletion tracked across rounds, reported as \% remaining\\
+\addlinespace[2pt]
+Mobility discussed qualitatively &
+Random-waypoint drift on AUV nodes, feeding back into link delay\\
+\addlinespace[2pt]
+Delay injection listed as a threat &
+$z$-score anomaly detector on the observed delay stream\\
+\addlinespace[2pt]
+Two comparison tables &
+Seven generated plots including throughput, a metric absent from the paper\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Organisation of the report}
+
+Chapter~\ref{ch:prelim} builds the cryptographic background from scratch: hash functions,
+symmetric and asymmetric encryption, elliptic curves, ECDH, nonces, timestamps and the
+Dolev--Yao adversary. Chapter~\ref{ch:proto} presents the base paper's network model and its
+three phases, with a full message-sequence chart and a worked numerical example.
+Chapter~\ref{ch:basesec} covers the paper's security analysis --- BAN logic, the informal
+propositions, Scyther --- and its performance tables. Chapter~\ref{ch:impl} describes our
+implementation and, candidly, its initial flaws. Chapter~\ref{ch:improve} presents the seven
+enhancements, with Section~\ref{sec:aes} devoted to the cipher replacement.
+Chapter~\ref{ch:scyther} describes the formal verification and the model restructuring that
+made it succeed. Chapter~\ref{ch:results} reports the measured results.
+Chapter~\ref{ch:conc} states our deviations from the paper, the limitations, and the future
+work.
