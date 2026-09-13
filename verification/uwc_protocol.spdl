@@ -1,0 +1,163 @@
+/*
+ * uwc_protocol.spdl
+ * ------------------
+ * Scyther model of the 4-hop, 12-message NSL-style authentication exchange
+ * used by uwcn.protocol.authentication.run_ns_authentication.
+ *
+ *   M1/M2/M3    = UWS  <-> SUB
+ *   M4/M5/M6    = SUB  <-> BUOY
+ *   M7/M8/M9    = BUOY <-> SAT
+ *   M10/M11/M12 = SAT  <-> BS
+ *
+ * Each hop is modeled as an independent protocol with two roles: Initiator
+ * and Responder, following the standard NSL pattern:
+ *
+ *   a) I -> R: {tag_a, I, Ni}pk(R)
+ *   b) R -> I: {tag_b, Ni, Nr, R}pk(I)
+ *   c) I -> R: {tag_c, Nr}pk(R)
+ *
+ * This is a message-flow / authentication-logic model. It does not model
+ * the concrete PEECC key-agreement construction used in the Python
+ * implementation (see docs/protocol.md for that caveat) -- it uses
+ * Scyther's standard asymmetric-key macros (pk/sk) as an abstraction of
+ * "encrypted under the recipient's public key".
+ */
+
+usertype Tag;
+
+const h1a, h1b, h1c: Tag;
+const h2a, h2b, h2c: Tag;
+const h3a, h3b, h3c: Tag;
+const h4a, h4b, h4c: Tag;
+
+protocol uwchop1(I, R)
+{
+    role I
+    {
+        fresh Ni: Nonce;
+        var Nr: Nonce;
+
+        send_1(I, R, {h1a, I, Ni}pk(R));
+        recv_2(R, I, {h1b, Ni, Nr, R}pk(I));
+        send_3(I, R, {h1c, Nr}pk(R));
+
+        claim(I, Secret, Ni);
+        claim(I, Secret, Nr);
+        claim(I, Niagree);
+        claim(I, Nisynch);
+    }
+
+    role R
+    {
+        var Ni: Nonce;
+        fresh Nr: Nonce;
+
+        recv_1(I, R, {h1a, I, Ni}pk(R));
+        send_2(R, I, {h1b, Ni, Nr, R}pk(I));
+        recv_3(I, R, {h1c, Nr}pk(R));
+
+        claim(R, Secret, Ni);
+        claim(R, Secret, Nr);
+        claim(R, Niagree);
+        claim(R, Nisynch);
+    }
+}
+
+protocol uwchop2(I, R)
+{
+    role I
+    {
+        fresh Ni: Nonce;
+        var Nr: Nonce;
+
+        send_1(I, R, {h2a, I, Ni}pk(R));
+        recv_2(R, I, {h2b, Ni, Nr, R}pk(I));
+        send_3(I, R, {h2c, Nr}pk(R));
+
+        claim(I, Secret, Ni);
+        claim(I, Secret, Nr);
+        claim(I, Niagree);
+        claim(I, Nisynch);
+    }
+
+    role R
+    {
+        var Ni: Nonce;
+        fresh Nr: Nonce;
+
+        recv_1(I, R, {h2a, I, Ni}pk(R));
+        send_2(R, I, {h2b, Ni, Nr, R}pk(I));
+        recv_3(I, R, {h2c, Nr}pk(R));
+
+        claim(R, Secret, Ni);
+        claim(R, Secret, Nr);
+        claim(R, Niagree);
+        claim(R, Nisynch);
+    }
+}
+
+protocol uwchop3(I, R)
+{
+    role I
+    {
+        fresh Ni: Nonce;
+        var Nr: Nonce;
+
+        send_1(I, R, {h3a, I, Ni}pk(R));
+        recv_2(R, I, {h3b, Ni, Nr, R}pk(I));
+        send_3(I, R, {h3c, Nr}pk(R));
+
+        claim(I, Secret, Ni);
+        claim(I, Secret, Nr);
+        claim(I, Niagree);
+        claim(I, Nisynch);
+    }
+
+    role R
+    {
+        var Ni: Nonce;
+        fresh Nr: Nonce;
+
+        recv_1(I, R, {h3a, I, Ni}pk(R));
+        send_2(R, I, {h3b, Ni, Nr, R}pk(I));
+        recv_3(I, R, {h3c, Nr}pk(R));
+
+        claim(R, Secret, Ni);
+        claim(R, Secret, Nr);
+        claim(R, Niagree);
+        claim(R, Nisynch);
+    }
+}
+
+protocol uwchop4(I, R)
+{
+    role I
+    {
+        fresh Ni: Nonce;
+        var Nr: Nonce;
+
+        send_1(I, R, {h4a, I, Ni}pk(R));
+        recv_2(R, I, {h4b, Ni, Nr, R}pk(I));
+        send_3(I, R, {h4c, Nr}pk(R));
+
+        claim(I, Secret, Ni);
+        claim(I, Secret, Nr);
+        claim(I, Niagree);
+        claim(I, Nisynch);
+    }
+
+    role R
+    {
+        var Ni: Nonce;
+        fresh Nr: Nonce;
+
+        recv_1(I, R, {h4a, I, Ni}pk(R));
+        send_2(R, I, {h4b, Ni, Nr, R}pk(I));
+        recv_3(I, R, {h4c, Nr}pk(R));
+
+        claim(R, Secret, Ni);
+        claim(R, Secret, Nr);
+        claim(R, Niagree);
+        claim(R, Nisynch);
+    }
+}
