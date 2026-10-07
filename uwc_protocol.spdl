@@ -5,7 +5,7 @@
  * Each hop = independent Needham-Schroeder-Lowe (NSL) 3-message exchange.
  *
  * Key design choices:
- *   - Asymmetric pk() encryption (matches paper's ECC/ECDH)
+ *   - Asymmetric pk() encryption (matches paper's PEECC/ECDH)
  *   - Hop-isolated nonces (no cross-hop leakage)
  *   - Message tags (h1a/h1b/h1c etc) prevent cross-protocol confusion
  *   - Responder identity inside msg 2 (the Lowe fix for Needham-Schroeder)
