@@ -185,7 +185,7 @@ Current result: **all 13 checks pass**.
 | Koblitz mapping | [18] says the message "has a point M" but never says how |
 | `0x01` marker, $\kappa=256$, 29-byte limit | keeps leading zeros/length; failure probability $2^{-256}$; keeps $x<p$ |
 | One block only | smallest verifiable unit; splitting into blocks is a later extension |
-| $S,K$ kept as full big integers | literal to the paper ("as big integers"); speed difference is negligible here |
+| $S,K$ kept as full big integers | literal to the paper ("as big integers"); costs speed: measured encryption is about 8x slower (14.6 ms vs about 1.7 ms) with the same output |
 | GMP, affine coordinates, double-and-add | standard big-number library; textbook formulas that map directly to the maths above |
 | OS randomness, 384 bits → $[1,N-1]$ | secure private keys, negligible modulo bias |
 | Tests and demo inside the same file | one file, easy to verify and present |
@@ -203,3 +203,31 @@ Current result: **all 13 checks pass**.
 
 ## 9. Next steps (not yet implemented)
 Multi-block messages, an optional hardened mode, then the 5-entity authentication protocol (initialization, registration, mutual authentication M1-M12, fallback) and its Scyther verification.
+
+---
+
+## 10. GUI simulation (`peecc_gui.py`)
+
+```bash
+python peecc_gui.py            # needs tkinter + matplotlib (pip install matplotlib)
+python peecc_gui.py --selftest # non-GUI check against peecc.exe values
+```
+
+* **Tab 1 - Pipeline:** animated block diagram (Alice / open channel + Eve / Bob) with a clickable 11-step progress bar, a
+  plain-English explanation, the equation and the real 256-bit values for each step. Switch between *Paper-exact [18]* and
+  *Improved (deviation)*; the table under the diagram logs C1 per run (constant in paper-exact mode).
+* **Tab 2 - Toy curve explorer:** `y^2 = x^3 + x + 1 (mod 23)` with every dot labelled by its multiple `k*B`; choose d, m and
+  the mode, see the double-and-add path of `d*B`, the `Pm -> C2` jump, the decryption arrow and Eve's attempt.
+* **Tab 3 - Math walkthrough (node by node):** the worked example on the toy curve `y^2 = x^3 + x + 1 (mod 23)`, `B = (18,3)`, `N = 28`.
+  For each step it shows who computes it (Alice / open channel / Bob / Eve), an input -> operation -> output block, the idea in
+  plain words, the core formula, and every number of the computation (slopes, modular inverses, double-and-add, point additions).
+* **Tab 4 - Improvements vs base paper:** a live benchmark runs both schemes on random messages and keys and reports
+  Eve's keyless success rate, distinct C1 values, repeatability of ciphertexts, multiplier size, point operations and
+  encryption time, plus a qualitative property table that also lists what is *not* improved (integrity, constant time).
+
+* **Tab 5 - Performance metrics:** measured/counted metrics for both schemes: key generation, encryption and decryption time,
+  scalar multiplications / point doublings / additions / field inversions, key and ciphertext sizes in bits, ciphertext expansion,
+  throughput, ciphertext uniqueness, keyless-eavesdropper success and the curve's ECDLP security level.
+
+The "improved" scheme is a deliberate deviation from [18]: a fresh random r replaces K, and points are validated before use.
+The GUI is a pure-Python re-implementation of the formulas of `peecc.c`; `--selftest` confirms it reproduces `peecc.exe`.
