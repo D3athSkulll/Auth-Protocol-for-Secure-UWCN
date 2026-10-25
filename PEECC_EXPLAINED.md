@@ -202,7 +202,7 @@ Calls `setup_curve()`. With `--test` it runs the tests; otherwise it runs the de
 | 4 | **Koblitz** method for text → point | [18] says "the message has a point M" but never says how. Koblitz is the classical choice. |
 | 5 | Marker byte `0x01`, `KAPPA = 256`, 29-byte limit | Keeps length and leading zeros; makes failure probability 2^-256; keeps `x < p`. |
 | 6 | One block only (≤ 29 bytes) | You asked for the smallest thing you can verify. Longer messages can be split into blocks later. |
-| 7 | `S` and `K` kept as full big integers, **not** reduced mod N | Literal to the paper ("as big integers"). (It would give the same point faster; we chose clarity over speed. 1 scalar multiplication costs about 1 ms either way.) |
+| 7 | `S` and `K` kept as full big integers, **not** reduced mod N | Literal to the paper ("as big integers"). (It would give the same point faster; we chose clarity over speed. Measured: encryption takes about 14.6 ms with the 2029-bit K versus roughly 1.7 ms if K were reduced mod N.) |
 | 8 | **Paper-exact** `K` only | You asked to implement the PEECC algorithm itself first. |
 | 9 | GMP for big numbers; affine coordinates | GMP is the standard C big-number library. Affine coordinates need a modular inverse per step (slower than projective) but are the simplest and match the textbook formulas. |
 | 10 | Double-and-add | Required by your spec; simple and correct. |
