@@ -696,9 +696,9 @@ def draw_toy(ax, E, pts, mult, fr, labels=True, dot=150, font=7, ring=430):
 C = dict(navy="#12263F", blue="#2F6FB0", lblue="#DCE9F7", green="#2E8B57", lgreen="#DDF0E3", orange="#E67E22",
          lorange="#FCE8D5", red="#B22222", lred="#F8DADA", grey="#EEF1F4", dgrey="#5B6770", yellow="#FFF6D6", white="#FFFFFF")
 NODES = {   # id: (cx, cy, title, body, fill)
-    "msg": (95, 62, "Plaintext", "message m", C["grey"]),
-    "kob": (295, 62, "Koblitz encode", "m -> point Pm", C["lblue"]),
-    "enc": (745, 62, "PEECC encrypt", "C1 = k*B\nC2 = Pm + k*Pub", C["lgreen"]),
+    "msg": (95, 78, "Plaintext", "message m", C["grey"]),
+    "kob": (295, 78, "Koblitz encode", "m -> point Pm", C["lblue"]),
+    "enc": (745, 78, "PEECC encrypt", "C1 = k*B\nC2 = Pm + k*Pub", C["lgreen"]),
     "params": (295, 160, "Public parameters", "p, a, b, B, N", C["grey"]),
     "pent": (520, 160, "Key number k", "paper: K = S^2+S+41\nimproved: random r", C["lblue"]),
     "chan": (745, 262, "Open channel", "(C1, C2) visible to all", C["lred"]),
@@ -713,7 +713,7 @@ EDGES = [("msg", "kob", "m"), ("kob", "enc", "Pm"), ("params", "pent", "B_x"), (
          ("keygen", "dec", "d (secret)"), ("dec", "dko", "Pm'"), ("dko", "out", "m"), ("chan", "eve", "copies")]
 SC = 0.9
 NODES = {k: (x * SC, y * SC, a, b, c) for k, (x, y, a, b, c) in NODES.items()}
-BW, BH = 160 * SC, 64 * SC
+BW, BH = 178 * SC, 74 * SC
 
 
 def run_gui():
@@ -724,6 +724,12 @@ def run_gui():
     from matplotlib.figure import Figure
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
+    if "--shots" in sys.argv:                      # screenshots are taken in physical pixels
+        try:
+            import ctypes
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
     root = tk.Tk()
     root.title("PEECC - Pentatope Elliptic Curve Cryptography: how it works, and how to improve it")
     root.geometry("%dx%d+10+10" % (min(1440, root.winfo_screenwidth() - 30), min(900, root.winfo_screenheight() - 90)))
@@ -754,10 +760,20 @@ def run_gui():
     improved_var = tk.BooleanVar(value=False)
 
     def update_badge():
-        if improved_var.get():
-            badge.config(text="IMPROVED  (random r + validation)", bg=C["green"])
+        """The badge shows the mode of the tab that is currently visible."""
+        try:
+            cur = nb.nametowidget(nb.select())
+        except Exception:
+            cur = None
+        imp = improved_var.get()
+        if cur is not None and cur is globals().get("_tab_mode_src", {}).get("t2"):
+            imp = mode2.get()
+        elif cur is not None and cur is globals().get("_tab_mode_src", {}).get("t5"):
+            imp = mode5.get()
+        if imp:
+            badge.config(text="IMPROVED  (random r)", bg=C["green"])
         else:
-            badge.config(text="PAPER-EXACT  (K is public - insecure)", bg=C["red"])
+            badge.config(text="PAPER-EXACT  (K public)", bg=C["red"])
 
     # =============================================================== TAB 1
     tab1 = ttk.Frame(nb); nb.add(tab1, text="1  Pipeline (real 256-bit values)")
@@ -829,8 +845,8 @@ def run_gui():
             cv.tag_lower(cv.create_rectangle(bb[0] - 3, bb[1] - 1, bb[2] + 3, bb[3] + 1, fill="white", outline=""), tid)
         for k, (x, y, ti, bo, col) in NODES.items():
             shapes[k] = rrect(x - BW / 2, y - BH / 2, BW, BH, fill=col, outline="#7A8794", width=2)
-            cv.create_text(x, y - 15 * SC, text=ti, font=("Segoe UI", 10, "bold"), fill=C["navy"])
-            cv.create_text(x, y + 8 * SC, text=bo, font=("Segoe UI", 8), fill="#333", justify="center")
+            cv.create_text(x, y - 24 * SC, text=ti, font=("Segoe UI", 10, "bold"), fill=C["navy"])
+            cv.create_text(x, y + 10 * SC, text=bo, font=("Segoe UI", 8), fill="#333", justify="center")
         S1["token"] = None
 
     draw_static()
@@ -1000,10 +1016,10 @@ def run_gui():
     math2.pack(anchor="w", padx=8, pady=2)
     verdict2 = tk.Label(ctrl, text="", bg=C["grey"], font=("Segoe UI", 11, "bold"), wraplength=330, justify="left")
     verdict2.pack(anchor="w", padx=8, pady=4)
-    fig = Figure(figsize=(6.4, 5.4), dpi=100, facecolor="white")
+    fig = Figure(figsize=(6.0, 4.7), dpi=100, facecolor="white")
     ax = fig.add_subplot(111)
     canvas2 = FigureCanvasTkAgg(fig, master=left2)
-    canvas2.get_tk_widget().config(width=640, height=540)
+    canvas2.get_tk_widget().config(width=600, height=470)
     canvas2.get_tk_widget().pack(fill="both", expand=True)
 
     def set_i2(i):
@@ -1058,6 +1074,7 @@ def run_gui():
         lst.selection_clear(0, "end"); lst.selection_set(T2["i"]); lst.see(T2["i"])
 
     def rebuild2():
+        update_badge()
         T2["frames"] = build_toy_frames(E2, pts2, max(1, min(E2.N - 1, int(d_var.get()))), int(m_var.get()), mode2.get(), int(r_var.get()))
         lst.delete(0, "end")
         for n, f in enumerate(T2["frames"], 1):
@@ -1221,7 +1238,7 @@ def run_gui():
     status4 = ttk.Label(ctl4, text="Press the button (random keys, message 'hello world')."); status4.pack(side="left", padx=8)
     cols4 = ("m", "u", "a", "b", "s")
     st.configure("Compact.Treeview", font=("Segoe UI", 9), rowheight=21)
-    tm = ttk.Treeview(tab4, columns=cols4, show="headings", height=15, style="Compact.Treeview")
+    tm = ttk.Treeview(tab4, columns=cols4, show="headings", height=16, style="Compact.Treeview")
     for c, w, nm in (("m", 420, "Metric"), ("u", 70, "Unit"), ("a", 170, "Base paper [18]"), ("b", 170, "Improved"), ("s", 150, "How obtained")):
         tm.heading(c, text=nm); tm.column(c, width=w, anchor="w" if c in ("m", "s") else "center")
     tm.tag_configure("diff", foreground=C["green"])
@@ -1284,10 +1301,10 @@ def run_gui():
     mid5 = ttk.Frame(body5); mid5.pack(side="left", fill="both", expand=True, padx=8)
     flow = tk.Canvas(mid5, width=560, height=235, bg=C["white"], highlightthickness=1, highlightbackground="#C9D2DA")
     flow.pack(fill="x")
-    fig5 = Figure(figsize=(5.0, 4.0), dpi=100, facecolor="white")
+    fig5 = Figure(figsize=(4.6, 3.5), dpi=100, facecolor="white")
     ax5 = fig5.add_subplot(111)
     canvas5 = FigureCanvasTkAgg(fig5, master=mid5)
-    canvas5.get_tk_widget().config(width=520, height=390)
+    canvas5.get_tk_widget().config(width=480, height=320)
     canvas5.get_tk_widget().pack(fill="both", expand=True, pady=(6, 0))
     title5 = tk.Label(right5, text="", bg=C["white"], fg=C["navy"], font=("Segoe UI", 14, "bold"), wraplength=470, justify="left")
     title5.pack(anchor="w", padx=10, pady=(8, 2))
@@ -1344,6 +1361,7 @@ def run_gui():
         lst5.selection_clear(0, "end"); lst5.selection_set(W5["i"]); lst5.see(W5["i"])
 
     def rebuild5():
+        update_badge()
         W5["steps"] = build_math_steps(EM, max(1, min(EM.N - 1, int(d5.get()))), int(m5.get()), mode5.get(), max(1, min(EM.N - 1, int(r5.get()))))
         lst5.delete(0, "end")
         for n, st_ in enumerate(W5["steps"], 1):
@@ -1390,13 +1408,13 @@ def run_gui():
 
         def grab(name):
             root.update(); root.update_idletasks()
-            f = root.winfo_fpixels("1i") / 96.0
+            f = 1.0                                   # process is DPI aware in --shots mode
             ImageGrab.grab(bbox=(int(root.winfo_rootx() * f), int(root.winfo_rooty() * f),
                                  int((root.winfo_rootx() + root.winfo_width()) * f),
                                  int((root.winfo_rooty() + root.winfo_height()) * f))).save("%s/%s.png" % (out, name))
 
         def seq(k=0):
-            plan = ["m6", "m10"]
+            plan = ["p11", "m8", "imp", "met"]
             if k >= len(plan):
                 root.destroy(); return
             n = plan[k]
