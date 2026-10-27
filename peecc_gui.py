@@ -3,15 +3,22 @@
 
 Tab 1  Pipeline        : the full process on secp256r1 with real 256-bit values (animated block diagram).
 Tab 2  Toy curve       : the same algorithm on y^2 = x^3 + x + 1 (mod 23); every point and every k*B is visible.
-Tab 3  Improvements    : live, measured comparison "base paper [18] as specified" vs "improved scheme".
+Tab 3  Math walkthrough: node-by-node worked example on the toy curve, every number of the computation.
+Tab 4  Improvements    : live, measured comparison "base paper [18] as specified" vs "improved scheme".
+Tab 5  Metrics         : measured / counted performance metrics of both schemes (Python, plus C via peecc.dll).
+Tab 6  Protocol        : the UWC protocol M1-M12 (protocol.py on peecc.dll) as a sequence diagram, with each
+                         message's plaintext, ciphertext blocks, checks, and what a keyless eavesdropper reads.
 
-Modes
-  paper-exact  : K = S^2 + S + 41 from the public generator, exactly as in [18] (this is what peecc.c implements)
-  improved     : DEVIATION from [18]: fresh random r instead of K, and points are validated before use.
+Modes (the same two modes as peecc.c)
+  paper-exact  : x = B_x, S = Pentatope(x), K = S^2 + S + 41, exactly as in [18] (peecc.c default)
+  improved     : DEVIATION from [18] (peecc.c --hardened): the pentatope input x is a fresh secret random number per
+                 message, K = (S^2 + S + 41) mod N, points are validated before use, and points are sent
+                 compressed (02/03 || x, 33 instead of 64 bytes).
 
 The mathematics is a pure-Python re-implementation of peecc.c.  `python peecc_gui.py --selftest` checks it against
 the values printed by peecc.exe (C1 and P_m of "hello world").  Needs tkinter + matplotlib.
 """
+import os
 import secrets
 import sys
 import time
@@ -109,20 +116,40 @@ def short(v, n=14):
     return h if len(h) <= 2 * n + 3 else h[:n] + "..." + h[-n:]
 
 
+def compress_hex(P, n=14):
+    """Compressed form of a point as peecc.c sends it in the improved mode: 02 (y even) / 03 (y odd) || x."""
+    return "O (infinity)" if P is None else "%02x | %s" % (3 if P[1] & 1 else 2, short(P[0], n))
+
+
 def fmt_pt(P, n=14):
     return "O (infinity)" if P is None else "x = %s\ny = %s" % (short(P[0], n), short(P[1], n))
 
 
+def hardened_K(E, x=None):
+    """Improved mode (DEVIATION from [18], peecc.c make_K --hardened): the pentatope input x is a fresh secret random
+    number in [1, N-1] instead of B_x; S = Pentatope(x), K = (S^2+S+41) mod N.  Returns (x, S, K).
+    K = 0 mod N is skipped: a new draw, or for a given x (toy curves) the next x."""
+    fixed = x is not None
+    while True:
+        if not fixed:
+            x = secrets.randbelow(E.N - 1) + 1
+        S = pentatope(x)
+        k = euler_K(S) % E.N
+        if k:
+            return x, S, k
+        x += 1
+
+
 def scheme_scalar(E, improved):
-    """The multiplier used for C1 = k*B and T = k*Pub.  paper-exact: public K; improved: fresh random r."""
+    """The multiplier used for C1 = k*B and T = k*Pub.  paper-exact: public K; improved: K from a random x."""
     if improved:
-        return secrets.randbelow(E.N - 1) + 1
+        return hardened_K(E)[2]
     return euler_K(pentatope(E.B[0]))
 
 
-def encrypt_point(E, Pm, Pub, improved):
-    """Returns (k, C1, T, C2)."""
-    k = scheme_scalar(E, improved)
+def encrypt_point(E, Pm, Pub, improved, k=None):
+    """Returns (k, C1, T, C2).  k may be given (to show how it was derived), otherwise it is drawn per mode."""
+    k = scheme_scalar(E, improved) if k is None else k
     C1, T = E.mul(k, E.B), E.mul(k, Pub)
     return k, C1, T, E.add(Pm, T)
 
@@ -149,7 +176,8 @@ def build_real_trace(msg, improved=False):
     t["m"], t["tries"], t["Pm"], t["j"] = koblitz_encode(E, msg)
     t["S"] = pentatope(E.B[0])
     t["K_paper"] = euler_K(t["S"])
-    t["K"], t["C1"], t["T"], t["C2"] = encrypt_point(E, t["Pm"], t["Pub"], improved)
+    t["x_h"], t["S_h"], k = hardened_K(E) if improved else (None, None, None)
+    t["K"], t["C1"], t["T"], t["C2"] = encrypt_point(E, t["Pm"], t["Pub"], improved, k)
     t["valid"] = E.valid(t["C1"]) and E.valid(t["C2"])
     t["dC1"] = E.mul(t["d"], t["C1"])
     t["Pm2"] = decrypt_point(E, t["C1"], t["C2"], t["d"], improved)
@@ -187,10 +215,12 @@ def real_steps(t):
          ("tries", tr), ("P_m", fmt_pt(t["Pm"])),
          ("look inside x", "0x%x   <- your bytes are readable here" % t["Pm"][0])])
     if imp:
-        add("Improved: fresh random r (not K)", ["pent"], ("params", "pent", "r"),
-            "IMPROVEMENT (deviation from [18]): instead of a number anybody can compute, Alice draws a new secret random r for every message.",
-            "r in [1, N-1] random   (256 bit)   replaces K = S^2 + S + 41",
-            [("r (secret, one-time)", short(t["K"])),
+        add("Improved: pentatope K from a secret random x", ["pent"], ("params", "pent", "x"),
+            "IMPROVEMENT (deviation from [18]): the pentatope and Euler steps stay, but their input is no longer the public B_x. "
+            "Alice draws a new secret random x for every message, so nobody else can compute K.",
+            "x in [1, N-1] random;   S = x(x+1)(x+2)(x+3)/24;   K = (S^2 + S + 41) mod N",
+            [("x (secret, one-time)", short(t["x_h"])), ("S  (%d bit)" % t["S_h"].bit_length(), short(t["S_h"])),
+             ("K mod N (secret)", short(t["K"])),
              ("size", "%d bit  (paper's K: %d bit)" % (t["K"].bit_length(), t["K_paper"].bit_length()))])
     else:
         add("The paper's key K from the pentatope number", ["params", "pent"], ("params", "pent", "B_x"),
@@ -201,17 +231,28 @@ def real_steps(t):
              ("who can compute K?", "EVERYONE (only B is needed)")])
     add("First ciphertext point  C1 = k * B", ["pent", "enc"], ("pent", "enc", "k"),
         "Alice multiplies the starting point B by her key number. In the paper this is the SAME point for every message ever sent."
-        if not imp else "With a fresh r this point is different for every message, so ciphertexts cannot be linked.",
-        "C1 = k * B      (k = K or r)",
+        if not imp else "With a fresh x (hence a fresh K) this point is different for every message, so ciphertexts cannot be linked.",
+        "C1 = K * B",
         [("C1", fmt_pt(t["C1"])),
          ("scalar size", "%d bit -> ~%d point operations" % (t["K"].bit_length(), t["K"].bit_length() + bin(t["K"]).count("1")))])
     add("Second ciphertext point  C2 = Pm + k * Pub", ["kob", "enc"], ("kob", "enc", "Pm"),
         "Alice masks her message point by adding k*Pub (a point only someone who knows k or d can remove).",
         "T = k * Pub;     C2 = P_m + T",
         [("T = k*Pub", fmt_pt(t["T"])), ("C2", fmt_pt(t["C2"]))])
-    add("Only (C1, C2) travels", ["enc", "chan"], ("enc", "chan", "(C1,C2)"),
-        "Two points, 4 x 256 bit = 1024 bit = 128 bytes, go over the open channel. Anybody can record them.",
-        "ciphertext = (C1, C2)", [("size", "128 bytes for an 11-byte message")])
+    if imp:
+        add("Only (C1, C2) travels - compressed", ["enc", "chan"], ("enc", "chan", "(C1,C2)"),
+            "IMPROVEMENT (deviation from the paper's 512-bit points): each point is sent as its x-coordinate plus one byte "
+            "saying whether y is even or odd. The receiver recomputes y = sqrt(x^3 + ax + b). 2 x 33 bytes = 528 bit instead "
+            "of 1024 bit. Anybody can still record them.",
+            "point = 02/03 || x   (33 bytes);   y = rhs^((p+1)/4), parity from the prefix",
+            [("C1 sent as", compress_hex(t["C1"])), ("C2 sent as", compress_hex(t["C2"])),
+             ("size", "66 bytes = 528 bit for a %d-byte message (paper's format: 128 bytes); one block per started "
+                      "29 bytes" % len(msg))])
+    else:
+        add("Only (C1, C2) travels", ["enc", "chan"], ("enc", "chan", "(C1,C2)"),
+            "Two points, 4 x 256 bit = 1024 bit = 128 bytes, go over the open channel. Anybody can record them.",
+            "ciphertext = (C1, C2)", [("size", "128 bytes for a %d-byte message (one block; peecc.c uses one block per "
+                                               "started 29 bytes)" % len(msg))])
     if imp:
         add("Bob validates and decrypts", ["chan", "dec", "keygen"], ("chan", "dec", "(C1,C2)"),
             "IMPROVEMENT: Bob first checks both points really lie on the curve (rejects forged/off-curve input), then computes C2 - d*C1.",
@@ -241,7 +282,7 @@ def real_steps(t):
          ("Eve reads", ('"%s"' % t["eve"].decode("utf-8", "replace")) if ev else "garbage - decoding fails")],
         ("bad", 'ATTACK SUCCEEDS: Eve read "%s" without any private key. Base-paper PEECC is not confidential.'
          % t["eve"].decode("utf-8", "replace")) if ev else
-        ("good", "ATTACK FAILS: the one-time secret r protects the message."))
+        ("good", "ATTACK FAILS: K now comes from a one-time secret x, not from the public B_x."))
     return S
 
 
@@ -290,7 +331,7 @@ def build_toy_frames(E, pts, d, m, improved, r, kappa=2):
     Pub = E.mul(d, B)
     _, tries, Pm, j = koblitz_encode(E, m, kappa)
     S = pentatope(B[0]); Kp = euler_K(S)
-    k = (r % N or 1) if improved else Kp
+    xh, Sh, k = hardened_K(E, r) if improved else (None, None, Kp)
     C1, T = E.mul(k, B), E.mul(k, Pub)
     C2 = E.add(Pm, T)
     dC1 = E.mul(d, C1)
@@ -316,9 +357,11 @@ def build_toy_frames(E, pts, d, m, improved, r, kappa=2):
                   math="tries: %s\nP_m = %s" % (", ".join("j=%d -> x=%d %s" % (jj, x, "ok" if ok else "no y") for jj, x, ok in tries), Pm),
                   marks={"B": B, "Pub": Pub, "Pm": Pm}, chain=[], arrows=[]))
     if improved:
-        F.append(dict(title="Improved: one-time random r",
-                      plain="Instead of the public K, Alice uses a fresh random r (here r = %d). A different r next time gives a different ciphertext." % k,
-                      math="r = %d   (the paper's K mod N would be %d)" % (k, Kp % N),
+        F.append(dict(title="Improved: K from a one-time random x",
+                      plain="The pentatope step stays, but its input is a fresh secret x (here x = %d) instead of the public B_x. "
+                            "A different x next time gives a different K and a different ciphertext." % xh,
+                      math="S = %d*%d*%d*%d/24 = %d;   K = (S^2+S+41) mod N = %d   (the paper's K mod N would be %d)"
+                           % (xh, xh + 1, xh + 2, xh + 3, Sh, k, Kp % N),
                       marks={"B": B, "Pub": Pub, "Pm": Pm}, chain=[], arrows=[]))
     else:
         F.append(dict(title="The paper's key K",
@@ -326,7 +369,7 @@ def build_toy_frames(E, pts, d, m, improved, r, kappa=2):
                       math="S = %d*%d*%d*%d/24 = %d;   K = %d;   K mod N = %d" % (B[0], B[0] + 1, B[0] + 2, B[0] + 3, S, Kp, Kp % N),
                       marks={"B": B, "Pub": Pub, "Pm": Pm}, chain=[], arrows=[]))
     F.append(dict(title="C1 = k * B",
-                  plain="Alice sends the first point C1 = k*B (k = %s)." % ("r" if improved else "K, the same every time"),
+                  plain="Alice sends the first point C1 = K*B (K %s)." % ("from the secret x" if improved else "from B_x, the same every time"),
                   math="C1 = %d*B = %s   (the dot labelled %d)" % (k, C1, mult.get(C1, 0)),
                   marks={"B": B, "Pub": Pub, "Pm": Pm, "C1": C1}, chain=[], arrows=[]))
     F.append(dict(title="C2 = P_m + k * Pub",
@@ -341,8 +384,8 @@ def build_toy_frames(E, pts, d, m, improved, r, kappa=2):
     F.append(dict(title="Eve without a key",
                   plain=("Eve knows B, Pub, (C1, C2), and the paper's K. She computes C2 - K*Pub and gets the message point: "
                          "ATTACK SUCCEEDS." if ok else
-                         "Eve assumes the paper's K, but Alice used a random r, so C2 - K*Pub is just another point: ATTACK FAILS "
-                         "(in a toy group she can be lucky only when r = K mod N)."),
+                         "Eve assumes the paper's K, but Alice's K came from a secret x, so C2 - K*Pub is just another point: ATTACK FAILS "
+                         "(in a toy group she can be lucky when both K values happen to agree mod N)."),
                   math="Eve: C2 - K*Pub = %s;   P_m = %s;   equal: %s" % (eve, Pm, ok),
                   marks={"Pub": Pub, "C2": C2, "Pm": Pm, "Eve": eve}, chain=[], arrows=[(C2, eve)], good=not ok))
     return F
@@ -428,8 +471,8 @@ def metrics_table(E, res):
         ("Field inversions per encryption (affine: 1 per point op)", "count", inv("c_enc", False), inv("c_enc", True), "counted"),
         ("Private key size", "bit", "256", "256", "fixed by curve"),
         ("Public key size (x and y)", "bit", "512", "512", "fixed by curve"),
-        ("Ciphertext size (C1 and C2)", "bit", "1024", "1024", "fixed by curve"),
-        ("Ciphertext expansion (%d-byte message)" % pl, "x", "%.1f" % (1024 / (8 * pl)), "%.1f" % (1024 / (8 * pl)), "derived"),
+        ("Ciphertext size per block (C1 and C2)", "bit", "1024", "528", "512-bit vs compressed points"),
+        ("Ciphertext expansion (%d-byte message)" % pl, "x", "%.1f" % (1024 / (8 * pl)), "%.1f" % (528 / (8 * pl)), "derived"),
         ("Same message + key encrypted twice: distinct ciphertexts", "of %d" % n,
          "%d" % sum(r["unique"] for r in res[False]), "%d" % sum(r["unique"] for r in res[True]), "measured"),
         ("Keyless eavesdropper recovers the message", "%", "%.0f" % (100.0 * sum(r["eve"] for r in res[False]) / n),
@@ -440,8 +483,19 @@ def metrics_table(E, res):
     ]
 
 
-# C reference values measured with peecc.c (docs/thesis, Table 8) - shown as reference, not computed here
+# Earlier C measurement (docs/thesis, Table 8), shown only when peecc.dll is not built
 C_REF = {"encrypt_ms": 14.626, "mul_2029_ms": 6.983, "mul_256_ms": 0.836}
+
+
+def c_bench():
+    """Measured C timings (ms) of keygen, encrypt and decrypt of one block for both modes via peecc_bench in
+    peecc.dll / libpeecc.so ({False: paper-exact, True: hardened}), or None if the library is not built."""
+    try:
+        import protocol as P
+        lib = P.Peecc()
+    except (OSError, ImportError):
+        return None
+    return {False: lib.bench(10, P.mode_of(False)), True: lib.bench(50, P.mode_of(True))}
 
 
 # ============================================================================= self-test
@@ -477,8 +531,12 @@ def selftest():
             for imp, rr in ((False, 10), (True, 10), (True, 1), (True, 27)):
                 steps = build_math_steps(EM, dd, mm, imp, rr)
                 assert len(steps) == 10 and all(st["trace"] for st in steps)
-    ex = build_math_steps(EM, 3, 3, True, 10)       # the worked example used in the presentation
-    assert "C2 = (5, 19)" in " ".join(ex[5]["trace"]) or "(5, 19)" in " ".join(ex[5]["trace"])
+    ex = build_math_steps(EM, 3, 3, True, 10)       # worked example: d = 3, m = 3, improved with x = 10
+    kx = hardened_K(EM, 10)[2]
+    assert kx == euler_K(pentatope(10)) % EM.N == 1
+    Pm3 = koblitz_encode(EM, 3, 2)[2]
+    assert fmt(EM.add(Pm3, EM.mul(kx, EM.mul(3, EM.B)))) in " ".join(ex[5]["trace"]), "C2 = P_m + K*Pub"
+    assert {euler_K(pentatope(x_)) % EM.N for x_ in range(1, EM.N)} == {1, 13, 15, 27}   # tiny group: only 4 K values
     assert "MATCH" in " ".join(ex[8]["trace"]) and ex[9]["good"]
     assert not build_math_steps(EM, 3, 3, False, 10)[9]["good"]
     T, pts = make_toy()
@@ -488,7 +546,20 @@ def selftest():
         for m in msgs:
             for d in range(1, T.N):
                 assert len(build_toy_frames(T, pts, d, m, imp, 5)) == 8
-    print("selftest OK: matches peecc.exe, round trips, eavesdropper (paper-exact breaks / improved blocks), validation, toy frames")
+    try:                                               # protocol tab (needs peecc.dll / libpeecc.so: make lib)
+        for hard in (False, True):
+            ev, sm = build_protocol_events(hard)
+            assert sm["ok"] and sm["messages"] == 12 and sm["sessions"] == 8
+            assert sm["wire_bits"] == (8448 if hard else 16384), "compressed points halve the ciphertext"
+            assert sm["eve_read"] == (0 if hard else 12), "eavesdropper on M1-M12"
+            assert all(e["plain"] is not None for e in ev if e["kind"] == "message")
+        ev, sm = build_protocol_events(True, 1)
+        assert sm["ok"] and any(e["kind"] == "fallback" and e["dst"] == "B2" for e in ev)
+        proto = ", protocol tab"
+    except OSError:
+        proto = " (protocol tab skipped: build peecc.dll with make lib)"
+    print("selftest OK: matches peecc.exe, round trips, eavesdropper (paper-exact breaks / improved blocks), validation, "
+          "toy frames" + proto)
 
 
 
@@ -555,7 +626,8 @@ def build_math_steps(E, d, m, improved, r, kappa=2):
     mult = toy_multiples(E)
     x = B[0]
     S = pentatope(x); K = euler_K(S)
-    k = (r if improved else K)
+    xh, Sh, kh = hardened_K(E, r) if improved else (None, None, None)
+    k = (kh if improved else K)
     kk = k % N
     St = []
 
@@ -592,13 +664,18 @@ def build_math_steps(E, d, m, improved, r, kappa=2):
          ["x = kappa*m + j", "y = rhs^((p+1)/4) mod p   (works because p = 3 mod 4)"], L,
          {"B": B, "Pub": Pub, "Pm": Pm})
     if improved:
-        L = ["r = %d is drawn at random from [1, N-1] (one-time secret, new for every message)" % r,
-             "r is NOT derived from the public generator, unlike the paper's K",
-             "(for comparison, the paper would use K = %d, i.e. K mod N = %d)" % (K, K % N)]
-        step("Choose the one-time number r", "Alice", ["random source"], "r = random in [1, N-1]", ["r (secret)"],
-             "Improvement: Alice draws a fresh secret number r for every message. Anybody can compute the paper's K from the public "
-             "generator, nobody can compute r.",
-             ["r in [1, N-1], fresh per message"], L, {"B": B, "Pub": Pub, "Pm": Pm})
+        Kh = euler_K(Sh)
+        L = ["x = %d is drawn at random from [1, N-1] (one-time secret, new for every message)%s"
+             % (xh, "" if xh == r else "  (x = %d gave K = 0 mod N, so the next x is used)" % r),
+             "S = x(x+1)(x+2)(x+3)/24 = %d*%d*%d*%d/24 = %d" % (xh, xh + 1, xh + 2, xh + 3, Sh),
+             "K = S^2 + S + 41 = %d^2 + %d + 41 = %d;   K mod %d = %d" % (Sh, Sh, Kh, N, kk),
+             "x is NOT the public B_x, so nobody else can compute this K",
+             "(for comparison, the paper uses x = B_x = %d: K = %d, K mod N = %d)" % (x, K, K % N)]
+        step("The key K from a one-time random x", "Alice", ["random source"], "x random;  S, K from x", ["K (secret)"],
+             "Improvement: the pentatope number and Euler's polynomial stay, but their input is a fresh secret x instead of the "
+             "public generator coordinate. Anybody can compute the paper's K, nobody can compute this one.",
+             ["x in [1, N-1], fresh per message", "S = x(x+1)(x+2)(x+3)/24", "K = (S^2 + S + 41) mod N"], L,
+             {"B": B, "Pub": Pub, "Pm": Pm})
     else:
         L = ["x = B_x = %d" % x, "S = x(x+1)(x+2)(x+3)/24 = %d*%d*%d*%d/24 = %d" % (x, x + 1, x + 2, x + 3, S),
              "K = S^2 + S + 41 = %d^2 + %d + 41 = %d" % (S, S, K),
@@ -611,7 +688,7 @@ def build_math_steps(E, d, m, improved, r, kappa=2):
     C1, tl = trace_mul(E, kk, B, "B")
     step("First ciphertext point  C1 = k * B", "Alice", ["k", "B"], "C1 = k * B", ["C1"],
          "Alice multiplies the starting point by k. C1 hides k (discrete-log problem), yet it lets Bob cancel the mask later.",
-         ["C1 = k * B"], ["k = %s%d (reduced mod N)" % ("r = " if improved else "K mod N = ", kk)] + tl,
+         ["C1 = k * B"], ["k = K mod N = %d (%s)" % (kk, "K from the secret x" if improved else "K from the public B_x")] + tl,
          {"B": B, "Pub": Pub, "Pm": Pm, "C1": C1})
     T, tl1 = trace_mul(E, kk, Pub, "Pub")
     C2, tl2 = trace_add(E, Pm, T, "P_m", "T")
@@ -647,12 +724,82 @@ def build_math_steps(E, d, m, improved, r, kappa=2):
     step("Attacker Eve (no private key)", "Eve", ["C1, C2, Pub", "B_x"], "C2 - K*Pub with K from B_x", ["guess of P_m"],
          "Eve knows everything on the channel. She computes the paper's K from the public generator and subtracts K*Pub. "
          + ("This equals the real mask, so she recovers the message: the paper's scheme is not confidential."
-            if ok else "The real mask used the secret r, not K, so she gets a wrong point: the message stays hidden."),
+            if ok else "The real mask used a K from the secret x, not from B_x, so she gets a wrong point: the message stays hidden."),
          ["Eve: P_m = C2 - K*Pub   (K = %d computed from B_x)" % K], ["K mod N = %d" % Kp, "K*Pub:"] + tl1 + ["", "C2 - K*Pub:"] + tl2 +
          ["", "true P_m = %s  ->  Eve %s" % (fmt(Pm), "SUCCEEDS (message exposed)" if ok else "FAILS (message safe)")],
          {"Pub": Pub, "C2": C2, "Pm": Pm, "Eve": eve}, arrows=[(C2, eve)])
     St[-1]["good"] = not ok
     return St
+
+
+# ============================================================================= results tab (figures written by simulate.py)
+RESULT_FIGS = (("claims_scorecard", "Claims scorecard (measured / claimed)"),
+               ("improvement_security", "Improvement: security (attacks, eavesdropper)"),
+               ("improvement_cost", "Improvement: cost (K size, point ops, time)"),
+               ("performance_entities", "Performance: operations and energy per entity"),
+               ("performance_latency", "Performance: latency per hop, fallback"),
+               ("communication_cost", "Communication cost (model vs on the wire)"),
+               ("latency", "Latency vs depth and node count"),
+               ("scyther_claims", "Scyther claims (Fig. 6)"))
+
+
+def claim_figures(claim):
+    """The figures that show the evidence for one row of the claims table."""
+    c = claim.lower()
+    if "communication" in c or "transmission" in c or "reduction" in c:
+        return ["communication_cost", "claims_scorecard"]
+    if "computation" in c:
+        return ["improvement_cost", "performance_entities"]
+    if "energy" in c:
+        return ["performance_entities"]
+    if "re-auth" in c:
+        return ["performance_latency"]
+    if "attack" in c:
+        return ["improvement_security"]
+    if "scyther" in c:
+        return ["scyther_claims"]
+    if "depth" in c:
+        return ["latency"]
+    return ["claims_scorecard"]
+
+
+# ============================================================================= protocol tab (protocol.py + peecc.dll)
+PROTO_SCENARIOS = ("Normal authentication S1 -> BS", "Buoy B1 unresponsive (fallback to B2)",
+                   "Satellite SAT1 answers 4 s late (fallback to SAT2)")
+
+
+def build_protocol_events(hardened, scenario=0, seed=1):
+    """Run IoT Sec. IV-C over the Fig. 1 path of S1 with the real C library and return (events, summary).
+    Each message event also carries what the receiver decrypts and what a keyless eavesdropper reads."""
+    import random
+    import protocol as P
+    import simulate as SIM
+    lib = P.Peecc()
+    net = SIM.new_network(lib, hardened, seed)
+    if scenario == 1:
+        net.nodes["B1"].alive = False
+    elif scenario == 2:
+        net.nodes["SAT1"].respond_delay = 4.0
+    ev = []
+    net.trace = lambda kind, e: ev.append(dict(e, kind=kind))
+    t0 = net.clock.now
+    res = SIM.run_chain(net, ["S1"], random.Random(seed))
+    net.trace = None
+    wire = model = 0
+    for e in ev:
+        if e["kind"] != "message":
+            continue
+        pkt = e["pkt"]
+        dst = net.nodes[pkt.dst]
+        e["plain"] = lib.decrypt(pkt.ct, dst.PK, net.mode)
+        e["eve"] = lib.eavesdrop(pkt.ct, dst.PU, net.mode)
+        e["model_bits"] = SIM.model_bits(dict(label=pkt.label, fields=pkt.fields))
+        wire += 8 * len(pkt.ct); model += e["model_bits"]
+    summary = dict(ok=all(ok for ok, _ in res.values()), seconds=net.clock.now - t0, wire_bits=wire, model_bits=model,
+                   sessions=net.sessions_created, eve_read=sum(1 for e in ev if e["kind"] == "message" and e["eve"] is not None),
+                   messages=sum(1 for e in ev if e["kind"] == "message"),
+                   kinds={n: net.nodes[n].kind for n in net.nodes})
+    return ev, summary
 
 
 def draw_toy(ax, E, pts, mult, fr, labels=True, dot=150, font=7, ring=430):
@@ -700,7 +847,7 @@ NODES = {   # id: (cx, cy, title, body, fill)
     "kob": (295, 78, "Koblitz encode", "m -> point Pm", C["lblue"]),
     "enc": (745, 78, "PEECC encrypt", "C1 = k*B\nC2 = Pm + k*Pub", C["lgreen"]),
     "params": (295, 160, "Public parameters", "p, a, b, B, N", C["grey"]),
-    "pent": (520, 160, "Key number k", "paper: K = S^2+S+41\nimproved: random r", C["lblue"]),
+    "pent": (520, 160, "Key number K", "S = Pent(B_x)\nK = S^2+S+41", C["lblue"]),
     "chan": (745, 262, "Open channel", "(C1, C2) visible to all", C["lred"]),
     "eve": (520, 262, "Eve (attacker)", "knows B, Pub, C1, C2", C["lorange"]),
     "keygen": (945, 392, "Bob's keys", "d secret, Pub = d*B", C["lorange"]),
@@ -708,9 +855,11 @@ NODES = {   # id: (cx, cy, title, body, fill)
     "dko": (520, 392, "Koblitz decode", "point -> bytes", C["lblue"]),
     "out": (295, 392, "Recovered", "message m", C["grey"]),
 }
-EDGES = [("msg", "kob", "m"), ("kob", "enc", "Pm"), ("params", "pent", "B_x"), ("pent", "enc", "k"),
-         ("keygen", "enc", "Pub (public)"), ("enc", "chan", "(C1,C2)"), ("chan", "dec", "(C1,C2)"),
-         ("keygen", "dec", "d (secret)"), ("dec", "dko", "Pm'"), ("dko", "out", "m"), ("chan", "eve", "copies")]
+PENT_BODY = {False: "S = Pent(B_x)\nK = S^2+S+41", True: "S = Pent(x), x random\nK = (S^2+S+41) mod N"}
+EDGES = [("msg", "kob", "m"), ("kob", "enc", "Pm"), ("params", "pent", "B_x"), ("pent", "enc", "K"),
+         ("keygen", "enc", "Pub"), ("enc", "chan", "(C1,C2)"), ("chan", "dec", "(C1,C2)"),
+         ("keygen", "dec", "d"), ("dec", "dko", "Pm'"), ("dko", "out", "m"), ("chan", "eve", "copies")]
+EDGE_LABEL_AT = {("keygen", "enc"): 0.3}       # label position along the edge (default: middle)
 SC = 0.9
 NODES = {k: (x * SC, y * SC, a, b, c) for k, (x, y, a, b, c) in NODES.items()}
 BW, BH = 178 * SC, 74 * SC
@@ -731,13 +880,13 @@ def run_gui():
         except Exception:
             pass
     root = tk.Tk()
-    root.title("PEECC - Pentatope Elliptic Curve Cryptography: how it works, and how to improve it")
+    root.title("PEECC and the UWC authentication protocol: how it works, and how to improve it")
     root.geometry("%dx%d+10+10" % (min(1440, root.winfo_screenwidth() - 30), min(900, root.winfo_screenheight() - 90)))
     root.configure(bg=C["grey"])
     st = ttk.Style()
     st.theme_use("clam")
     st.configure("TNotebook", background=C["grey"], borderwidth=0)
-    st.configure("TNotebook.Tab", padding=(18, 8), font=("Segoe UI", 11, "bold"), background="#D5DBE1")
+    st.configure("TNotebook.Tab", padding=(14, 8), font=("Segoe UI", 11, "bold"), background="#D5DBE1")
     st.map("TNotebook.Tab", background=[("selected", C["white"])], foreground=[("selected", C["blue"])])
     st.configure("TFrame", background=C["grey"]); st.configure("TLabel", background=C["grey"], font=("Segoe UI", 10))
     st.configure("TLabelframe", background=C["grey"]); st.configure("TLabelframe.Label", background=C["grey"], font=("Segoe UI", 10, "bold"))
@@ -751,13 +900,14 @@ def run_gui():
     hdr = tk.Frame(root, bg=C["navy"]); hdr.pack(fill="x")
     tk.Label(hdr, text="PEECC  -  Pentatope Elliptic Curve Cryptography", bg=C["navy"], fg="white",
              font=("Segoe UI", 18, "bold")).pack(side="left", padx=18, pady=10)
-    tk.Label(hdr, text="Base paper [18]  |  secp256r1  |  C implementation: peecc.c", bg=C["navy"], fg="#9FB3C8",
+    tk.Label(hdr, text="Base paper [18]  |  secp256r1  |  C: peecc.c / peecc.dll  |  protocol: protocol.py (IoT Sec. IV)", bg=C["navy"], fg="#9FB3C8",
              font=("Segoe UI", 10)).pack(side="left", padx=6)
     badge = tk.Label(hdr, text="", font=("Segoe UI", 11, "bold"), fg="white", padx=14, pady=4)
     badge.pack(side="right", padx=18)
 
     nb = ttk.Notebook(root); nb.pack(fill="both", expand=True)
     improved_var = tk.BooleanVar(value=False)
+    mode_src = {}                                 # tab -> its mode variable (tabs without one follow tab 1)
 
     def update_badge():
         """The badge shows the mode of the tab that is currently visible."""
@@ -765,21 +915,17 @@ def run_gui():
             cur = nb.nametowidget(nb.select())
         except Exception:
             cur = None
-        imp = improved_var.get()
-        if cur is not None and cur is globals().get("_tab_mode_src", {}).get("t2"):
-            imp = mode2.get()
-        elif cur is not None and cur is globals().get("_tab_mode_src", {}).get("t5"):
-            imp = mode5.get()
+        imp = mode_src.get(cur, improved_var).get()
         if imp:
-            badge.config(text="IMPROVED  (random r)", bg=C["green"])
+            badge.config(text="IMPROVED  (random pentatope input x)", bg=C["green"])
         else:
             badge.config(text="PAPER-EXACT  (K public)", bg=C["red"])
 
     # =============================================================== TAB 1
-    tab1 = ttk.Frame(nb); nb.add(tab1, text="1  Pipeline (real 256-bit values)")
+    tab1 = ttk.Frame(nb); nb.add(tab1, text="1  Pipeline (256-bit)")
     S1 = {"steps": [], "i": -1, "auto": None, "anim": None, "token": None, "hist": 0}
     bar = ttk.Frame(tab1); bar.pack(fill="x", padx=10, pady=(8, 2))
-    ttk.Label(bar, text="Message (max 29 bytes):").pack(side="left")
+    ttk.Label(bar, text="Message (one block, max 29 bytes):").pack(side="left")
     msg_var = tk.StringVar(value="hello world")
     ttk.Entry(bar, textvariable=msg_var, width=26, font=("Segoe UI", 11)).pack(side="left", padx=6)
     ttk.Radiobutton(bar, text="Paper-exact [18]", variable=improved_var, value=False,
@@ -821,7 +967,7 @@ def run_gui():
     tree.tag_configure("bad", foreground=C["red"]); tree.tag_configure("good", foreground=C["green"])
     tree.pack(fill="x", padx=4, pady=4)
 
-    shapes, edge_ids = {}, {}
+    shapes, edge_ids, body_ids, label_ids = {}, {}, {}, {}
 
     def rrect(x, y, w, h, **kw):
         r = 12
@@ -838,15 +984,20 @@ def run_gui():
             cv.create_text(16, (y0 + 12) * SC, text=lab, anchor="w", fill=C["dgrey"], font=("Segoe UI", 9, "bold"))
         for a, b, lab in EDGES:
             ax_, ay = NODES[a][:2]; bx, by = NODES[b][:2]
-            dash = (6, 4) if lab.startswith(("d (", "copies")) else None
+            dash = (6, 4) if lab in ("d", "copies") else None
             edge_ids[(a, b)] = cv.create_line(ax_, ay, bx, by, arrow="last", width=2, fill="#9AA5B1", dash=dash)
-            tid = cv.create_text((ax_ + bx) / 2, (ay + by) / 2, text=lab, fill=C["dgrey"], font=("Segoe UI", 8, "italic"))
-            bb = cv.bbox(tid)
-            cv.tag_lower(cv.create_rectangle(bb[0] - 3, bb[1] - 1, bb[2] + 3, bb[3] + 1, fill="white", outline=""), tid)
         for k, (x, y, ti, bo, col) in NODES.items():
             shapes[k] = rrect(x - BW / 2, y - BH / 2, BW, BH, fill=col, outline="#7A8794", width=2)
-            cv.create_text(x, y - 24 * SC, text=ti, font=("Segoe UI", 10, "bold"), fill=C["navy"])
-            cv.create_text(x, y + 10 * SC, text=bo, font=("Segoe UI", 8), fill="#333", justify="center")
+            cv.create_text(x, y - 21 * SC, text=ti, font=("Segoe UI", 10, "bold"), fill=C["navy"], width=BW - 10, justify="center")
+            body_ids[k] = cv.create_text(x, y + 11 * SC, text=bo, font=("Segoe UI", 8), fill="#333", justify="center", width=BW - 12)
+        for a, b, lab in EDGES:                              # labels on top, in the gaps between the boxes
+            ax_, ay = NODES[a][:2]; bx, by = NODES[b][:2]
+            f = EDGE_LABEL_AT.get((a, b), 0.5)
+            tid = cv.create_text(ax_ + (bx - ax_) * f, ay + (by - ay) * f, text=lab, fill=C["dgrey"], font=("Segoe UI", 8, "italic"))
+            bb = cv.bbox(tid)
+            rid = cv.create_rectangle(bb[0] - 3, bb[1] - 1, bb[2] + 3, bb[3] + 1, fill="white", outline="")
+            cv.tag_lower(rid, tid)
+            label_ids[(a, b)] = (tid, rid)
         S1["token"] = None
 
     draw_static()
@@ -883,23 +1034,43 @@ def run_gui():
             for item in S1["token"]:
                 cv.delete(item)
         S1["token"] = None
+        for ids in label_ids.values():                 # edge labels hidden by an earlier token come back
+            for item in ids:
+                cv.itemconfig(item, state="normal")
+
+    def border(cx, cy, dx, dy):
+        """Point where a line from the box centre (cx, cy) in direction (dx, dy) leaves the box."""
+        t = min((BW / 2) / abs(dx) if dx else 1e9, (BH / 2) / abs(dy) if dy else 1e9)
+        return cx + dx * t, cy + dy * t
 
     def animate(src, dst, label):
+        """Token travels from the source box border to the destination box border; its label stays outside the boxes."""
         clear_token()
-        (x0, y0), (x1, y1) = NODES[src][:2], NODES[dst][:2]
+        (cx0, cy0), (cx1, cy1) = NODES[src][:2], NODES[dst][:2]
+        dx, dy = cx1 - cx0, cy1 - cy0
+        x0, y0 = border(cx0, cy0, dx, dy)
+        x1, y1 = border(cx1, cy1, -dx, -dy)
+        horizontal = abs(dx) >= abs(dy)              # horizontal: label pinned in the gap between the boxes
+        gap = ((x0 + x1) / 2, (y0 + y1) / 2 - 14)
+        off = (12, -12 if dy > 0 else 12)            # vertical: label beside the moving token
         o = cv.create_oval(x0 - 8, y0 - 8, x0 + 8, y0 + 8, fill=C["orange"], outline="white", width=2)
         tb = cv.create_rectangle(0, 0, 1, 1, fill="white", outline=C["orange"])
-        tx = cv.create_text(x0, y0 - 24, text=label, fill=C["orange"], font=("Segoe UI", 10, "bold"))
+        tx = cv.create_text(*(gap if horizontal else (x0 + off[0], y0 + off[1])), text=label, anchor="center" if horizontal else "w",
+                            fill=C["orange"], font=("Segoe UI", 10, "bold"))
         S1["token"] = (o, tb, tx)
         if (src, dst) in edge_ids:
             cv.itemconfig(edge_ids[(src, dst)], fill=C["orange"], width=4)
+            for item in label_ids[(src, dst)]:          # the token's own label replaces the static one
+                cv.itemconfig(item, state="hidden")
         frames = 30
 
         def tick(n=0):
             f = n / frames
             f = f * f * (3 - 2 * f)
             x, y = x0 + (x1 - x0) * f, y0 + (y1 - y0) * f
-            cv.coords(o, x - 8, y - 8, x + 8, y + 8); cv.coords(tx, x, y - 24)
+            cv.coords(o, x - 8, y - 8, x + 8, y + 8)
+            if not horizontal:
+                cv.coords(tx, x + off[0], y + off[1])
             bb = cv.bbox(tx); cv.coords(tb, bb[0] - 4, bb[1] - 2, bb[2] + 4, bb[3] + 2)
             if n < frames:
                 S1["anim"] = root.after(16, tick, n + 1)
@@ -912,7 +1083,8 @@ def run_gui():
         S1["i"] = i
         s = steps[i]
         title_lbl.config(text="Step %d/%d:  %s" % (i + 1, len(steps), s["title"]))
-        plain_lbl.config(text=s["plain"]); math_lbl.config(text=s["math"])
+        plain_lbl.config(text=s["plain"])
+        math_lbl.config(text="\n".join(p.strip() for p in s["math"].replace(";", "   ").split("   ") if p.strip()))
         set_active(s["active"])
         if S1["anim"]:
             root.after_cancel(S1["anim"])
@@ -933,8 +1105,9 @@ def run_gui():
         update_badge()
         data = msg_var.get().encode("utf-8")
         if len(data) > 29:
-            title_lbl.config(text="Message too long (max 29 bytes)"); return
+            title_lbl.config(text="Message too long: this tab shows one block (max 29 bytes); peecc.c splits longer messages"); return
         t = build_real_trace(data, improved_var.get())
+        cv.itemconfig(body_ids["pent"], text=PENT_BODY[improved_var.get()])
         S1["steps"] = real_steps(t)
         S1["hist"] += 1
         broke = t["eve"] == data
@@ -980,7 +1153,7 @@ def run_gui():
     stepper.bind("<Configure>", lambda e: draw_stepper())
 
     # =============================================================== TAB 2 (toy curve explorer)
-    tab2 = ttk.Frame(nb); nb.add(tab2, text="2  Toy curve explorer")
+    tab2 = ttk.Frame(nb); nb.add(tab2, text="2  Toy curve")
     E2, pts2 = make_toy()
     msgs2 = toy_valid_messages(E2)
     mult2 = toy_multiples(E2)
@@ -998,9 +1171,9 @@ def run_gui():
     cb = ttk.Combobox(row, values=msgs2, textvariable=m_var, width=4, state="readonly"); cb.pack(side="left", padx=4)
     cb.bind("<<ComboboxSelected>>", lambda e: rebuild2())
     ttk.Radiobutton(ctrl, text="Paper-exact (public K)", variable=mode2, value=False, command=lambda: rebuild2()).pack(anchor="w", padx=8, pady=(8, 0))
-    ttk.Radiobutton(ctrl, text="Improved (one-time random r)", variable=mode2, value=True, command=lambda: rebuild2()).pack(anchor="w", padx=8)
+    ttk.Radiobutton(ctrl, text="Improved (one-time random pentatope input x)", variable=mode2, value=True, command=lambda: rebuild2()).pack(anchor="w", padx=8)
     row = ttk.Frame(ctrl); row.pack(fill="x", padx=8, pady=2)
-    ttk.Label(row, text="   r =").pack(side="left")
+    ttk.Label(row, text="   x =").pack(side="left")
     ttk.Spinbox(row, from_=1, to=E2.N - 1, textvariable=r_var, width=4, command=lambda: rebuild2()).pack(side="left")
     ttk.Checkbutton(ctrl, text="label every dot with its k  (dot = k*B)", variable=lab_var, command=lambda: draw2()).pack(anchor="w", padx=8, pady=6)
     lst = tk.Listbox(ctrl, height=8, font=("Segoe UI", 10), activestyle="none", exportselection=False, bg="white")
@@ -1102,15 +1275,16 @@ def run_gui():
     rebuild2()
 
     # =============================================================== TAB 3 (improvements)
-    tab3 = ttk.Frame(nb); nb.add(tab3, text="4  Improvements vs base paper")
+    tab3 = ttk.Frame(nb); nb.add(tab3, text="4  Improvements")
     top3 = tk.Frame(tab3, bg=C["white"], highlightbackground="#C9D2DA", highlightthickness=1)
     top3.pack(fill="x", padx=10, pady=(8, 4))
     tk.Label(top3, text="What we change relative to the base paper [18]   (deviations: the paper's own scheme is the left column)",
              bg=C["white"], fg=C["navy"], font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=12, pady=(8, 2))
-    for txt_ in ("1.  Fresh random one-time number r instead of K = S^2+S+41   ->  K is computable by anybody from the public generator, r is not.",
-                 "2.  Validate C1 and C2 (on curve, in range) before using them   ->  the C code never checks (finding F4).",
-                 "3.  Multiplier is 256 bit (r) instead of 2029 bit (K)   ->  about 8x fewer point operations per encryption.",
-                 "Not fixed by either scheme: no authentication / integrity tag, not constant-time, 29-byte blocks."):
+    for txt_ in ("1.  Pentatope input x is a fresh secret random number instead of B_x   ->  the paper's K is computable by anybody, the new K is not.",
+                 "2.  Validate C1 and C2 (on curve, in range) before using them   ->  the paper-exact mode never checks (finding F4).",
+                 "3.  K is reduced mod N (256 bit instead of 2029 bit)   ->  same points, about 8x fewer point operations per encryption.",
+                 "4.  Points are sent compressed (02/03 || x, 33 instead of 64 bytes)   ->  528 instead of 1024 bit per ciphertext block.",
+                 "Not fixed by either scheme: no authentication / integrity tag, not constant-time, blocks of a long message are independent."):
         tk.Label(top3, text=txt_, bg=C["white"], fg="#333" if not txt_.startswith("Not") else C["red"], font=("Segoe UI", 10),
                  anchor="w", justify="left").pack(anchor="w", padx=18)
     tk.Label(top3, text="", bg=C["white"]).pack()
@@ -1126,11 +1300,12 @@ def run_gui():
 
     mid3 = ttk.Frame(tab3); mid3.pack(fill="both", expand=True, padx=10, pady=4)
     leftm = ttk.Frame(mid3); leftm.pack(side="left", fill="both", expand=True)
-    tq = ttk.Treeview(leftm, columns=("m", "a", "b", "c"), show="headings", height=8)
+    st.configure("Tab4.Treeview", font=("Segoe UI", 10), rowheight=22)
+    tq = ttk.Treeview(leftm, columns=("m", "a", "b", "c"), show="headings", height=8, style="Tab4.Treeview")
     for c, w, nm in (("m", 270, "Quantitative metric (measured live)"), ("a", 150, "Base paper [18]"), ("b", 150, "Improved"), ("c", 150, "Change")):
         tq.heading(c, text=nm); tq.column(c, width=w, anchor="w")
     tq.tag_configure("good", foreground=C["green"]); tq.pack(fill="x")
-    tql = ttk.Treeview(leftm, columns=("p", "a", "b", "e"), show="headings", height=8)
+    tql = ttk.Treeview(leftm, columns=("p", "a", "b", "e"), show="headings", height=10, style="Tab4.Treeview")
     for c, w, nm in (("p", 250, "Qualitative property"), ("a", 110, "Base paper [18]"), ("b", 110, "Improved"), ("e", 270, "Evidence")):
         tql.heading(c, text=nm); tql.column(c, width=w, anchor="w")
     tql.tag_configure("yes", foreground=C["green"]); tql.tag_configure("no", foreground=C["red"]); tql.tag_configure("same", foreground=C["dgrey"])
@@ -1138,11 +1313,13 @@ def run_gui():
             ("Confidential against a passive eavesdropper", "NO", "YES", "live: keyless Eve success rate", "yes"),
             ("Same message twice -> different ciphertext", "NO", "YES", "live metric above", "yes"),
             ("Ciphertexts unlinkable (C1 differs)", "NO", "YES", "live: distinct C1 count", "yes"),
-            ("Rejects off-curve / forged points", "NO", "YES", "peecc.c has no check (F4); selftest", "yes"),
-            ("Follows the paper's key derivation exactly", "YES", "NO", "improved drops the pentatope K on purpose", "no"),
+            ("Rejects off-curve / forged points", "NO", "YES", "peecc.c --hardened / pt_valid; selftest", "yes"),
+            ("Compact ciphertext (528 bit/block)", "NO", "YES", "compressed points 02/03 || x", "yes"),
+            ("Keeps the pentatope + Euler key derivation", "YES", "YES", "only the input x changes (B_x -> random)", "same"),
+            ("Follows the paper's key derivation exactly", "YES", "NO", "x = B_x replaced by a random x on purpose", "no"),
             ("Message authentication / integrity", "NO", "NO", "neither scheme has a tag - future work", "same"),
             ("Constant-time / side-channel safe", "NO", "NO", "neither (educational code)", "same"),
-            ("Message size per block", "29 B", "29 B", "unchanged", "same")):
+            ("Message size per block (longer messages: several blocks)", "29 B", "29 B", "unchanged", "same")):
         tql.insert("", "end", values=(p_, a_, b_, e_), tags=(tg,))
     tql.pack(fill="x", pady=(8, 0))
     fig3 = Figure(figsize=(4.4, 5.6), dpi=100, facecolor="white")
@@ -1193,12 +1370,18 @@ def run_gui():
                 ("Multiplier size (bits)", "%d" % bits[0], "%d (max)" % bits[1], "%.1fx smaller" % (bits[0] / bits[1])),
                 ("Point operations per scalar mult. (derived)", "~%d" % ops0, "~%d" % ops1, "~%.1fx fewer" % (ops0 / ops1)),
                 ("Encrypt time, this Python program", "%.1f ms" % ms[0], "%.1f ms" % ms[1], "%.1fx faster" % (ms[0] / ms[1])),
-                ("Encrypt time, peecc.c (reference)", "%.1f ms" % C_REF["encrypt_ms"], "~%.1f ms (est.)" % (2 * C_REF["mul_256_ms"]),
-                 "~%.0fx faster (est.)" % (C_REF["encrypt_ms"] / (2 * C_REF["mul_256_ms"]))),
                 ("Decryption still correct", "%d of %d" % (sum(r["ok"] for r in res[False]), n), "%d of %d" % (sum(r["ok"] for r in res[True]), n), "no loss")]
+        cb = c_bench()
+        if cb:
+            rows.insert(6, ("Encrypt time, peecc.c (measured now)", "%.2f ms" % cb[False][1], "%.2f ms" % cb[True][1],
+                            "%.1fx faster" % (cb[False][1] / cb[True][1])))
+        else:
+            rows.insert(6, ("Encrypt time, peecc.c (earlier, est.)", "%.1f ms" % C_REF["encrypt_ms"], "~%.1f ms (est.)" % (2 * C_REF["mul_256_ms"]),
+                            "~%.0fx faster (est.)" % (C_REF["encrypt_ms"] / (2 * C_REF["mul_256_ms"]))))
         for r_ in rows:
             tq.insert("", "end", values=r_, tags=("good",))
-        status3.config(text="Done: %d trials per scheme. peecc.c row = earlier measurement (thesis Table 8); 'est.' = 2 x 256-bit multiplication." % n)
+        status3.config(text="Done: %d trials per scheme. %s" % (n, "peecc.c row: measured now (peecc.dll)."
+                       if cb else "peecc.dll not built (make lib): peecc.c row = earlier measurement; 'est.' = 2 x 256-bit multiplication."))
         go3.config(state="normal")
         draw3()
 
@@ -1219,7 +1402,7 @@ def run_gui():
         root.after(30, bench_tick)
 
     # =============================================================== TAB 4 (performance metrics)
-    tab4 = ttk.Frame(nb); nb.add(tab4, text="5  Performance metrics")
+    tab4 = ttk.Frame(nb); nb.add(tab4, text="5  Metrics")
     top4 = tk.Frame(tab4, bg=C["white"], highlightbackground="#C9D2DA", highlightthickness=1)
     top4.pack(fill="x", padx=10, pady=(8, 4))
     tk.Label(top4, text="Metrics used to evaluate an ECC / PEECC scheme", bg=C["white"], fg=C["navy"],
@@ -1227,7 +1410,7 @@ def run_gui():
     for t_ in ("Computation cost: time per operation (ms) and number of scalar multiplications / point operations - as in the cost tables of the UWC-N paper (Table V uses T_ecm).",
                "Communication and storage cost: key and ciphertext size in bits, ciphertext expansion - as in the UWC-N paper (Table IV, sizes in bits).",
                "Security: ECDLP security level of the curve, plus measured resistance to a passive (keyless) eavesdropper and ciphertext uniqueness.",
-               "Times: pure-Python version of the same formulas (absolute ms differ from peecc.c; counts and ratios are comparable)."):
+               "Times: pure-Python version of the same formulas, plus rows measured in C through peecc.dll (counts and ratios are comparable)."):
         tk.Label(top4, text=t_, bg=C["white"], fg="#333", font=("Segoe UI", 9), anchor="w", justify="left").pack(anchor="w", padx=18)
     ctl4 = ttk.Frame(tab4); ctl4.pack(fill="x", padx=10, pady=4)
     n4 = tk.IntVar(value=12)
@@ -1238,8 +1421,8 @@ def run_gui():
     status4 = ttk.Label(ctl4, text="Press the button (random keys, message 'hello world')."); status4.pack(side="left", padx=8)
     cols4 = ("m", "u", "a", "b", "s")
     st.configure("Compact.Treeview", font=("Segoe UI", 9), rowheight=21)
-    tm = ttk.Treeview(tab4, columns=cols4, show="headings", height=16, style="Compact.Treeview")
-    for c, w, nm in (("m", 420, "Metric"), ("u", 70, "Unit"), ("a", 170, "Base paper [18]"), ("b", 170, "Improved"), ("s", 150, "How obtained")):
+    tm = ttk.Treeview(tab4, columns=cols4, show="headings", height=20, style="Compact.Treeview")
+    for c, w, nm in (("m", 420, "Metric"), ("u", 70, "Unit"), ("a", 170, "Base paper [18]"), ("b", 170, "Improved"), ("s", 190, "How obtained")):
         tm.heading(c, text=nm); tm.column(c, width=w, anchor="w" if c in ("m", "s") else "center")
     tm.tag_configure("diff", foreground=C["green"])
     tm.pack(fill="x", padx=10, pady=4)
@@ -1250,12 +1433,21 @@ def run_gui():
     def finish_met():
         for iid in tm.get_children():
             tm.delete(iid)
-        for row in metrics_table(REAL, M4["res"]):
+        rows4 = metrics_table(REAL, M4["res"])
+        cb = c_bench()
+        if cb:
+            for j, name in enumerate(("Key generation", "Encryption (one block)", "Decryption (one block)")):
+                rows4.insert(3 + j, ("%s time, peecc.c" % name, "ms", "%.3f" % cb[False][j], "%.3f" % cb[True][j], "measured (C, peecc_bench)"))
+        for row in rows4:
             tm.insert("", "end", values=row, tags=("diff",) if row[2] != row[3] else ())
-        note4.config(text="Green rows differ between the schemes. peecc.c reference (earlier C measurement): encrypt %.1f ms, "
-                          "pt_mul with the 2029-bit K %.2f ms vs %.2f ms with a 256-bit scalar. Sizes, decryption cost and the "
-                          "curve's ECDLP level are identical in both schemes; neither scheme has an integrity tag."
-                     % (C_REF["encrypt_ms"], C_REF["mul_2029_ms"], C_REF["mul_256_ms"]))
+        note4.config(text="Green rows differ between the schemes. " + (
+            "The peecc.c rows are measured now through peecc.dll (peecc_bench). " if cb else
+            "peecc.dll not built (make lib); earlier C measurement: encrypt %.1f ms, pt_mul 2029-bit K %.2f ms vs %.2f ms "
+            "with a 256-bit scalar. " % (C_REF["encrypt_ms"], C_REF["mul_2029_ms"], C_REF["mul_256_ms"])) +
+            "Sizes, decryption cost and the curve's ECDLP level are identical in both schemes; neither scheme has an "
+            "integrity tag. Messages longer than 29 bytes take one block per started 29 bytes (peecc.c): 1024 bit with the "
+            "paper's 512-bit points, 528 bit with compressed points (improved). "
+            "Protocol-level metrics (M1-M12: 16 384 bit on the wire paper-exact, 8 448 bit improved) are in tab 6 and tab 7.")
         status4.config(text="Done: %d trials per scheme." % M4["n"]); go4.config(state="normal")
 
     def met_tick():
@@ -1273,7 +1465,7 @@ def run_gui():
         root.after(20, met_tick)
 
     # =============================================================== TAB 5 (math walkthrough, node by node)
-    tab5 = ttk.Frame(nb); nb.insert(2, tab5, text="3  Math walkthrough (node by node)")
+    tab5 = ttk.Frame(nb); nb.insert(2, tab5, text="3  Math walkthrough")
     EM = make_math_curve()
     ptsM = [(xx, yy) for xx in range(EM.p) for yy in range(EM.p) if (yy * yy - (xx ** 3 + xx + 1)) % EM.p == 0]
     multM = toy_multiples(EM)
@@ -1287,7 +1479,7 @@ def run_gui():
     cb5 = ttk.Combobox(bar5, values=validM, textvariable=m5, width=4, state="readonly"); cb5.pack(side="left", padx=(4, 12))
     cb5.bind("<<ComboboxSelected>>", lambda e: rebuild5())
     ttk.Radiobutton(bar5, text="Paper-exact [18]", variable=mode5, value=False, command=lambda: rebuild5()).pack(side="left")
-    ttk.Radiobutton(bar5, text="Improved:  r =", variable=mode5, value=True, command=lambda: rebuild5()).pack(side="left", padx=(8, 0))
+    ttk.Radiobutton(bar5, text="Improved:  x =", variable=mode5, value=True, command=lambda: rebuild5()).pack(side="left", padx=(8, 0))
     ttk.Spinbox(bar5, from_=1, to=EM.N - 1, textvariable=r5, width=4, command=lambda: rebuild5()).pack(side="left", padx=4)
     play5 = ttk.Button(bar5, text="Play", style="Accent.TButton", command=lambda: toggle5()); play5.pack(side="right", padx=2)
     ttk.Button(bar5, text="Next >", command=lambda: step5(1)).pack(side="right", padx=2)
@@ -1388,6 +1580,324 @@ def run_gui():
 
     rebuild5()
 
+    # =============================================================== TAB 6 (the UWC protocol, M1-M12)
+    tab6 = ttk.Frame(nb); nb.add(tab6, text="6  Protocol M1-M12")
+    mode6 = tk.BooleanVar(value=False)
+    scen6 = tk.StringVar(value=PROTO_SCENARIOS[0])
+    W6 = {"ev": [], "sum": None, "i": 0, "auto": None, "cols": []}
+    bar6 = ttk.Frame(tab6); bar6.pack(fill="x", padx=10, pady=(8, 2))
+    ttk.Label(bar6, text="Scenario:").pack(side="left")
+    cb6 = ttk.Combobox(bar6, values=PROTO_SCENARIOS, textvariable=scen6, width=40, state="readonly"); cb6.pack(side="left", padx=4)
+    cb6.bind("<<ComboboxSelected>>", lambda e: rebuild6())
+    ttk.Radiobutton(bar6, text="Paper-exact [18]", variable=mode6, value=False, command=lambda: rebuild6()).pack(side="left", padx=(12, 2))
+    ttk.Radiobutton(bar6, text="Hardened (deviation)", variable=mode6, value=True, command=lambda: rebuild6()).pack(side="left", padx=2)
+    ttk.Button(bar6, text="New run", command=lambda: rebuild6()).pack(side="left", padx=(12, 2))
+    ttk.Button(bar6, text="Run attack suite", command=lambda: attacks6()).pack(side="left", padx=2)
+    play6 = ttk.Button(bar6, text="Play", style="Accent.TButton", command=lambda: toggle6()); play6.pack(side="right", padx=2)
+    ttk.Button(bar6, text="Next >", command=lambda: step6(1)).pack(side="right", padx=2)
+    ttk.Button(bar6, text="< Back", command=lambda: step6(-1)).pack(side="right", padx=2)
+    sum6 = tk.Label(tab6, text="", bg=C["white"], fg=C["navy"], font=("Segoe UI", 10, "bold"), anchor="w", padx=10, pady=4)
+    sum6.pack(fill="x", padx=10, pady=(2, 4))
+    body6 = ttk.Frame(tab6); body6.pack(fill="both", expand=True, padx=10, pady=(0, 8))
+    lst6 = tk.Listbox(body6, width=30, font=("Segoe UI", 10), activestyle="none", exportselection=False, bg="white")
+    lst6.pack(side="left", fill="y")
+    lst6.bind("<<ListboxSelect>>", lambda e: (W6.__setitem__("i", lst6.curselection()[0]), draw6()) if lst6.curselection() else None)
+    det6 = tk.Text(body6, width=58, font=("Consolas", 9), wrap="word", bg="#F8FAFB", relief="flat", state="disabled")
+    det6.pack(side="right", fill="both", padx=(8, 0))
+    for tg, col in (("h", C["navy"]), ("good", C["green"]), ("bad", C["red"]), ("dim", C["dgrey"])):
+        det6.tag_configure(tg, foreground=col, font=("Consolas", 10 if tg == "h" else 9, "bold" if tg != "dim" else "normal"))
+    seq6 = tk.Canvas(body6, bg=C["white"], highlightthickness=1, highlightbackground="#C9D2DA")
+    seq6.pack(side="left", fill="both", expand=True, padx=(8, 0))
+    seq6.bind("<Configure>", lambda e: draw6())
+    KORD = {"UWS": 0, "SUB": 1, "B": 2, "SAT": 3, "BS": 4}
+
+    def ev_title(e):
+        k = e["kind"]
+        if k == "message":
+            p = e["pkt"]
+            return "%-4s %s -> %s%s" % (p.label, p.src, p.dst, "" if e["ok"] else "  REJECTED")
+        if k == "session":
+            return "session %s <-> %s" % (e["a"], e["b"])
+        if k == "timeout":
+            return "%-4s %s -> %s  no reply" % (e["label"], e["src"], e["dst"])
+        return "FALLBACK %s -> %s" % (e["src"], e["dst"])
+
+    def draw6():
+        seq6.delete("all")
+        if not W6["ev"]:
+            return
+        w, h = max(seq6.winfo_width(), 500), max(seq6.winfo_height(), 400)
+        cols = W6["cols"]
+        xs = {n: 50 + (w - 100) * k / max(1, len(cols) - 1) for k, n in enumerate(cols)}
+        top, row = 58, max(18, min(30, (h - 80) / max(1, len(W6["ev"]))))
+        kinds = W6["sum"]["kinds"]
+        for n in cols:
+            seq6.create_rectangle(xs[n] - 44, 8, xs[n] + 44, 42, fill=C["lblue"], outline=C["blue"])
+            seq6.create_text(xs[n], 25, text="%s\n(%s)" % (n, kinds[n]), font=("Segoe UI", 9, "bold"), justify="center")
+            seq6.create_line(xs[n], 42, xs[n], h - 10, fill="#C9D2DA", dash=(4, 3))
+        for j, e in enumerate(W6["ev"][:W6["i"] + 1]):
+            y = top + j * row
+            cur = j == W6["i"]
+            k = e["kind"]
+            if k == "message":
+                p = e["pkt"]
+                col = C["orange"] if cur else (C["dgrey"] if e["ok"] else C["red"])
+                seq6.create_line(xs[p.src], y, xs[p.dst], y, arrow="last", width=3 if cur else 1.5, fill=col)
+                eve = "  Eve reads it" if e["eve"] is not None else ""
+                seq6.create_text((xs[p.src] + xs[p.dst]) / 2, y - 7, text="%s  %d bit%s" % (p.label, 8 * len(p.ct), eve),
+                                 font=("Segoe UI", 8, "bold" if cur else "normal"), fill=C["red"] if eve else C["navy"])
+            elif k == "session":
+                a, b = sorted((xs[e["a"]], xs[e["b"]]))
+                seq6.create_rectangle(a, y - 6, b, y + 6, fill=C["lgreen"], outline=C["green"], width=2 if cur else 1)
+                seq6.create_text((a + b) / 2, y, text="session established", font=("Segoe UI", 8), fill=C["green"])
+            elif k == "timeout":
+                seq6.create_line(xs[e["src"]], y, xs[e["dst"]], y, arrow="last", dash=(6, 4), fill=C["red"], width=2)
+                seq6.create_text(xs[e["dst"]], y - 8, text="X no reply", fill=C["red"], font=("Segoe UI", 8, "bold"))
+            else:
+                seq6.create_text(xs[e["src"]] + 6, y, anchor="w", text="FALLBACK: %s -> %s" % (e["after"], e["dst"]),
+                                 fill=C["orange"], font=("Segoe UI", 9, "bold"))
+        show6(W6["ev"][W6["i"]])
+        lst6.selection_clear(0, "end"); lst6.selection_set(W6["i"]); lst6.see(W6["i"])
+
+    def put6(text, tag=()):
+        det6.insert("end", text + "\n", tag)
+
+    def show6(e):
+        det6.configure(state="normal"); det6.delete("1.0", "end")
+        k = e["kind"]
+        if k == "message":
+            p = e["pkt"]
+            put6("%s   %s -> %s   t = %.3f s" % (p.label, p.src, p.dst, e["t"]), "h")
+            put6("PEECC-encrypted with %s's public key" % p.dst, "dim")
+            put6("\nPlaintext fields (what %s puts in the message)" % p.src, "h")
+            for f, v in p.fields.items():
+                put6("  %-13s %s" % (f, v))
+            bb = e["block"]
+            nb_ = len(p.ct) // bb
+            put6("\nOn the wire: %d block(s) x %d bit = %d bit   (paper-model size %d bit)"
+                 % (nb_, 8 * bb, 8 * len(p.ct), e["model_bits"]), "h")
+            put6("  points %s" % ("compressed: 02/03 || x (33 bytes each)" if bb < 128 else "x || y (64 bytes each, as in the paper)"),
+                 "dim")
+            for b in range(nb_):
+                c = p.ct[bb * b:bb * (b + 1)]
+                put6("  block %d  C1 %s..  C2 %s.." % (b + 1, c[:10].hex(), c[bb // 2:bb // 2 + 10].hex()))
+            put6("\nReceiver %s checks" % p.dst, "h")
+            for name, ok in e["checks"]:
+                put6("  [%s] %s" % ("ok" if ok else "FAIL", name), "good" if ok else "bad")
+            put6("  => %s" % ("ACCEPTED" if e["ok"] else "REJECTED: " + e["why"]), "good" if e["ok"] else "bad")
+            put6("\nReceiver decrypts with its private key", "h")
+            put6("  " + (e["plain"].hex() if e["plain"] is not None else "(rejected)"))
+            put6("\nEve (no key): C2 - K_paper * Pub", "h")
+            if e["eve"] is not None:
+                put6("  reads " + e["eve"].hex(), "bad")
+                put6("  = the plaintext: the paper's K is public, so this message is NOT confidential", "bad")
+            else:
+                put6("  cannot read it: K came from a secret random x (hardened mode)", "good")
+        elif k == "session":
+            put6("Session S_%s<->%s established" % (e["a"], e["b"]), "h")
+            put6("\nThe initiator received its own nonce back (only the holder of the responder's private key can read "
+                 "the request) and the timestamps were fresh: |TS_resp - TS_req| < dT.")
+            if not mode6.get():
+                put6("\nIn paper-exact mode this proof is void: anybody can read the request with the public K.", "bad")
+        elif k == "timeout":
+            put6("%s %s -> %s: no reply" % (e["label"], e["src"], e["dst"]), "h")
+            put6("\n%s waited dT = %.2f s for the response; the peer is unresponsive." % (e["src"], e["wait"]))
+        else:
+            put6("Fallback (IoT Sec. IV-D)", "h")
+            put6("\n%s gives up on %s and re-authenticates with its preregistered fallback peer %s, "
+                 "with the same nonce and timestamp checks." % (e["src"], e["after"], e["dst"]))
+        det6.configure(state="disabled")
+
+    def rebuild6():
+        update_badge()
+        if W6["auto"] is not None:
+            toggle6()
+        sum6.config(text="running the protocol with peecc.dll ...", fg=C["navy"]); root.update_idletasks()
+        try:
+            ev, sm = build_protocol_events(mode6.get(), PROTO_SCENARIOS.index(scen6.get()))
+        except (OSError, ImportError) as ex:
+            sum6.config(text="Protocol library not available (%s). Build it with `make lib`." % ex, fg=C["red"])
+            return
+        names = []
+        for e in ev:
+            for n in ([e["pkt"].src, e["pkt"].dst] if e["kind"] == "message" else [e.get("src"), e.get("dst"), e.get("a"), e.get("b")]):
+                if n and n not in names:
+                    names.append(n)
+        W6.update(ev=ev, sum=sm, i=0, cols=sorted(names, key=lambda n: (KORD[sm["kinds"][n]], names.index(n))))
+        sum6.config(fg=C["green"] if sm["eve_read"] == 0 else C["red"], text=
+                    "%s  |  %d messages, %d bit on the wire (paper model %d bit)  |  %.2f s simulated  |  %d sessions  |  "
+                    "keyless Eve reads %d of %d messages" % ("authenticated" if sm["ok"] else "FAILED", sm["messages"], sm["wire_bits"],
+                                                             sm["model_bits"], sm["seconds"], sm["sessions"], sm["eve_read"], sm["messages"]))
+        lst6.delete(0, "end")
+        for n, e in enumerate(ev, 1):
+            lst6.insert("end", "%2d. %s" % (n, ev_title(e)))
+        draw6()
+
+    def attacks6():
+        import simulate as SIM
+        import protocol as P
+        sum6.config(text="running 11 attacks on fresh networks ...", fg=C["navy"]); root.update_idletasks()
+        res = SIM.attack_suite(P.Peecc(), mode6.get(), 1)
+        det6.configure(state="normal"); det6.delete("1.0", "end")
+        put6("Attack suite (%s)" % ("hardened" if mode6.get() else "paper-exact"), "h")
+        for a in res:
+            put6("\n%s" % a["name"], "h")
+            put6("  %s - %s" % ("DETECTED" if a["detected"] else "NOT DETECTED", a["detail"]), "good" if a["detected"] else "bad")
+        det6.configure(state="disabled")
+        n = sum(a["detected"] for a in res)
+        sum6.config(text="attack suite: %d of %d detected (details on the right)" % (n, len(res)),
+                    fg=C["green"] if n == len(res) else C["red"])
+
+    def step6(dl):
+        if W6["ev"]:
+            W6["i"] = max(0, min(len(W6["ev"]) - 1, W6["i"] + dl)); draw6()
+
+    def tick6():
+        if W6["auto"] is None:
+            return
+        if W6["i"] >= len(W6["ev"]) - 1:
+            toggle6(); return
+        step6(1); W6["auto"] = root.after(1800, tick6)
+
+    def toggle6():
+        if W6["auto"] is not None:
+            root.after_cancel(W6["auto"]); W6["auto"] = None; play6.config(text="Play"); return
+        if W6["i"] >= len(W6["ev"]) - 1:
+            W6["i"] = 0; draw6()
+        play6.config(text="Pause"); W6["auto"] = root.after(1800, tick6)
+
+    # =============================================================== TAB 7 (results: claims and the charts behind them)
+    tab7 = ttk.Frame(nb); nb.add(tab7, text="7  Results & charts")
+    left7 = ttk.Frame(tab7); left7.pack(side="left", fill="y", padx=(10, 4), pady=8)
+    ttk.Label(left7, text="Paper claims (select one to show its charts)", font=("Segoe UI", 10, "bold")).pack(anchor="w")
+    tc = ttk.Treeview(left7, columns=("c", "p", "a", "b"), show="headings", height=17, style="Compact.Treeview")
+    for c, w, nm in (("c", 255, "Claim"), ("p", 62, "Paper"), ("a", 88, "paper-exact"), ("b", 88, "hardened")):
+        tc.heading(c, text=nm); tc.column(c, width=w, anchor="w" if c == "c" else "center")
+    for tg, col in (("PASS", C["green"]), ("FAIL", C["red"]), ("N.A.", C["dgrey"])):
+        tc.tag_configure(tg, foreground=col)
+    tc.pack(anchor="w")
+    ttk.Label(left7, text="Charts shown (tick / untick)", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(10, 2))
+    show7 = {k: tk.BooleanVar(value=(k == "claims_scorecard")) for k, _ in RESULT_FIGS}
+    for k, title in RESULT_FIGS:
+        ttk.Checkbutton(left7, text=title, variable=show7[k], command=lambda: draw7()).pack(anchor="w")
+    row7 = ttk.Frame(left7); row7.pack(anchor="w", pady=(8, 0))
+    ttk.Button(row7, text="All", command=lambda: set7(k for k, _ in RESULT_FIGS)).pack(side="left", padx=(0, 4))
+    ttk.Button(row7, text="None", command=lambda: set7(())).pack(side="left", padx=4)
+    ttk.Button(row7, text="Redraw from saved results", command=lambda: regen7()).pack(side="left", padx=4)
+    info7 = ttk.Label(left7, text="", wraplength=440, justify="left"); info7.pack(anchor="w", pady=(8, 0))
+    right7 = ttk.Frame(tab7); right7.pack(side="left", fill="both", expand=True, padx=(4, 10), pady=8)
+    cv7 = tk.Canvas(right7, bg=C["white"], highlightthickness=1, highlightbackground="#C9D2DA")
+    sb7 = ttk.Scrollbar(right7, orient="vertical", command=cv7.yview)
+    cv7.configure(yscrollcommand=sb7.set)
+    sb7.pack(side="right", fill="y"); cv7.pack(side="left", fill="both", expand=True)
+    cv7.bind("<MouseWheel>", lambda e: cv7.yview_scroll(int(-e.delta / 120), "units"))
+    cv7.bind("<Configure>", lambda e: draw7())
+    W7 = {"imgs": [], "claims": {}, "width": 0, "head": ""}
+    results_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
+
+    def load_image(path, width):
+        """PNG scaled to the canvas width (Pillow if available, otherwise Tk's integer subsample)."""
+        try:
+            from PIL import Image, ImageTk
+            im = Image.open(path)
+            if im.width > width:
+                im = im.resize((width, int(im.height * width / im.width)), Image.LANCZOS)
+            return ImageTk.PhotoImage(im)
+        except ImportError:
+            im = tk.PhotoImage(file=path)
+            f = max(1, -(-im.width() // width))
+            return im.subsample(f) if f > 1 else im
+
+    def draw7():
+        cv7.delete("all"); W7["imgs"] = []
+        width = max(400, cv7.winfo_width() - 20)
+        y = 10
+        if W7["head"]:
+            st_ = W7["head"].split("\n")
+            col = C["green"] if st_[-1].endswith("PASS") else C["red"] if st_[-1].endswith("FAIL") else C["dgrey"]
+            t = cv7.create_text(14, y + 6, anchor="nw", text=W7["head"], font=("Segoe UI", 10), fill="#222", width=width - 20)
+            bb = cv7.bbox(t)
+            cv7.tag_lower(cv7.create_rectangle(8, y, width + 10, bb[3] + 6, fill="#F3F5F7", outline=col, width=2), t)
+            y = bb[3] + 18
+        chosen = [(k, t) for k, t in RESULT_FIGS if show7[k].get()]
+        if not chosen:
+            cv7.create_text(20, 20, anchor="nw", text="No chart selected: tick a chart on the left or select a claim.",
+                            font=("Segoe UI", 11), fill=C["dgrey"])
+        for k, title in chosen:
+            path = os.path.join(results_dir, k + ".png")
+            cv7.create_text(10, y, anchor="nw", text=title, font=("Segoe UI", 11, "bold"), fill=C["navy"])
+            y += 24
+            if not os.path.exists(path):
+                cv7.create_text(10, y, anchor="nw", fill=C["red"], font=("Segoe UI", 10),
+                                text="results/%s.png not found: run  python simulate.py --all  (and --all --hardened)" % k)
+                y += 30; continue
+            img = load_image(path, width)
+            W7["imgs"].append(img)
+            cv7.create_image(10, y, anchor="nw", image=img)
+            y += img.height() + 18
+        cv7.configure(scrollregion=(0, 0, width + 20, y))
+
+    def set7(keys):
+        keys = set(keys)
+        for k, v in show7.items():
+            v.set(k in keys)
+        cv7.yview_moveto(0); draw7()
+
+    def fill7():
+        for iid in tc.get_children():
+            tc.delete(iid)
+        try:
+            import simulate as SIM
+            M = SIM.load_modes()
+        except ImportError:
+            M = {}
+        rows = {}
+        for mode, m in M.items():
+            for r in m.get("claims", []):
+                rows.setdefault(r["claim"], dict(paper=r["paper"], status=r["status"]))[mode] = r["measured"]
+                if r["status"] == "FAIL":
+                    rows[r["claim"]]["status"] = "FAIL"
+        W7["claims"] = rows
+        for name, r in rows.items():
+            short_ = lambda s: (s or "-").split(" (")[0][:12]
+            tc.insert("", "end", iid=name, values=(name, r["paper"], short_(r.get("paper-exact")), short_(r.get("hardened"))),
+                      tags=(r["status"],))
+        info7.config(text=("Green = met, red = not met in at least one mode (modes found: %s)." % ", ".join(M)) if M else
+                     "No saved results yet: run  python simulate.py --all  and  python simulate.py --all --hardened.")
+
+    def on_claim(e):
+        sel = tc.selection()
+        if not sel:
+            return
+        name = sel[0]
+        r = W7["claims"].get(name, {})
+        W7["head"] = ("%s\npaper: %s     |     paper-exact run: %s     |     hardened run: %s\nresult: %s"
+                      % (name, r.get("paper"), r.get("paper-exact", "-"), r.get("hardened", "-"), r.get("status")))
+        set7(claim_figures(name))
+    tc.bind("<<TreeviewSelect>>", on_claim)
+
+    def regen7():
+        import simulate as SIM
+        import protocol as P
+        info7.config(text="redrawing figures ..."); root.update_idletasks()
+        try:
+            SIM.figures(P.Peecc())
+        except OSError as ex:
+            info7.config(text="peecc.dll not available (%s): build it with make lib" % ex); return
+        fill7(); draw7()
+
+    built7 = {"done": False}
+    mode_src.update({tab2: mode2, tab5: mode5, tab6: mode6})
+    built6 = {"done": False}
+
+    def on_tab(e):
+        cur = nb.nametowidget(nb.select())
+        if cur is tab6 and not built6["done"]:
+            built6["done"] = True; rebuild6()
+        if cur is tab7 and not built7["done"]:
+            built7["done"] = True; fill7(); draw7()
+    nb.bind("<<NotebookTabChanged>>", lambda e: (update_badge(), on_tab(e)), add="+")
+
     update_badge()
     def key_next(delta):
         cur = nb.nametowidget(nb.select())
@@ -1397,6 +1907,8 @@ def run_gui():
             step2(delta)
         elif cur is tab5:
             step5(delta)
+        elif cur is tab6:
+            step6(delta)
     root.bind("<Right>", lambda e: key_next(1))
     root.bind("<Left>", lambda e: key_next(-1))
     root.after(300, run)
@@ -1414,12 +1926,24 @@ def run_gui():
                                  int((root.winfo_rooty() + root.winfo_height()) * f))).save("%s/%s.png" % (out, name))
 
         def seq(k=0):
-            plan = ["p11", "m8", "imp", "met"]
+            plan = sys.argv[sys.argv.index("--shots") + 2].split(",") if len(sys.argv) > sys.argv.index("--shots") + 2 \
+                else ["p11", "m8", "imp", "met"]
             if k >= len(plan):
                 root.destroy(); return
             n = plan[k]
-            if n.startswith("p"):
-                nb.select(tab1); show_step(int(n[1:]) - 1)
+            if n.startswith("res"):                     # res<i>: tab 7 with claim row i selected
+                nb.select(tab7); root.update()
+                rows_ = tc.get_children()
+                if rows_:
+                    tc.selection_set(rows_[int(n[3:]) - 1])
+            elif n.startswith("proto"):                 # proto<i>[h]: tab 6, event i, h = hardened
+                nb.select(tab6); mode6.set(n.endswith("h")); rebuild6()
+                W6["i"] = int(n[5:].rstrip("h")) - 1; draw6()
+            elif n.startswith("p"):
+                nb.select(tab1)
+                if n.endswith("h") and not improved_var.get():          # p<i>h: improved mode
+                    improved_var.set(True); run()
+                show_step(int(n[1:].rstrip("h")) - 1)
             elif n.startswith("m") and n != "met":
                 nb.select(tab5); W5["i"] = int(n[1:]) - 1; draw5()
             elif n == "met":

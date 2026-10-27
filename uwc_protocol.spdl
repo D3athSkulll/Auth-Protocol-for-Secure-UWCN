@@ -1,156 +1,212 @@
 /*
- * UWC Authentication Protocol - Scyther Formal Verification
+ * UWC authentication protocol of Rupa et al. (IEEE IoT-J 2025), Sec. IV - Scyther model.
  *
- * 4-hop chain:  UWS <-> SUB <-> BUOY <-> SAT <-> BS
- * Each hop = independent Needham-Schroeder-Lowe (NSL) 3-message exchange.
+ * Messages M1-M12 carry exactly the paper's fields, in the paper's order. Each hop is its own two-role protocol:
+ * the paper establishes one session per hop with hop-local nonces and timestamps, and Scyther's Alive / agreement
+ * claims in a single five-role protocol would refer to all five roles, which no hop-local exchange can establish
+ * (that variant also needs more than 9 minutes at 5 runs). All protocols run concurrently in one analysis.
  *
- * Key design choices:
- *   - Asymmetric pk() encryption (matches paper's PEECC/ECDH)
- *   - Hop-isolated nonces (no cross-hop leakage)
- *   - Message tags (h1a/h1b/h1c etc) prevent cross-protocol confusion
- *   - Responder identity inside msg 2 (the Lowe fix for Needham-Schroeder)
+ * Abstractions: PEECC is ideal public-key encryption {..}pk(X), so Scyther CANNOT see the K-public flaw of
+ * paper-exact PEECC (shown instead by `peecc --test` (test_K_is_public) and `simulate.py --attacks`). 8-bit
+ * timestamps are fresh values, so their 12.8 s wrap-around is not modelled. Data forwarded upward (ENV, Alerts,
+ * GPS) is modelled as fresh at each hop. Nothing was added to the messages to make claims hold.
  *
- * Expected:  32/32 claims pass  |  Execution time: < 1 second at max-runs=5
+ * Run:  scyther-w32 --max-runs=5 uwc_protocol.spdl
  */
 
-usertype Tag;
-const h1a, h1b, h1c: Tag;
-const h2a, h2b, h2c: Tag;
-const h3a, h3b, h3c: Tag;
-const h4a, h4b, h4c: Tag;
+hashfunction H;
+usertype Timestamp, Data;
 
-/* ===  HOP 1: UWS <-> SUB  === */
-protocol uwchop1(UWS, SUB)
+/* ---- IoT Sec. IV-B: registration of entity I with entity J ------------------------------------------------
+ * RID_I = H(ID_I || PU_I || PK_I), v_I = H(RID_I || PU_I); {RID_I, PU_I, v_I} is sent in the clear and J checks
+ * v_I = H(RID_I || PU_I). */
+protocol uwcreg(I, J)
+{
+    role I
+    {
+        send_R1(I, J, H(I, pk(I), sk(I)), pk(I), H(H(I, pk(I), sk(I)), pk(I)));
+        claim(I, Secret, sk(I));
+    }
+    role J
+    {
+        var RID: Ticket;
+        recv_R1(I, J, RID, pk(I), H(RID, pk(I)));
+        claim(J, Alive);
+    }
+}
+
+/* ---- IoT Sec. IV-C Steps 1-4: UWS <-> SUB, messages M1, M2, M3 -------------------------------------------- */
+protocol hop1(UWS, SUB)
 {
     role UWS
     {
-        fresh Nu: Nonce;
-        var   Ns: Nonce;
+        fresh Nuws: Nonce;
+        fresh TS1, TS3: Timestamp;
+        fresh Env: Data;
+        var TS2: Timestamp;
 
-        send_1(UWS, SUB, {h1a, UWS, Nu}pk(SUB));
-        recv_2(SUB, UWS, {h1b, Nu, Ns, SUB}pk(UWS));
-        send_3(UWS, SUB, {h1c, Ns}pk(SUB));
+        send_1(UWS, SUB, {UWS, Nuws, TS1}pk(SUB));
+        recv_2(SUB, UWS, {SUB, Nuws, TS2}pk(UWS));
+        send_3(UWS, SUB, {SUB, Env, TS3}pk(SUB));
 
+        claim(UWS, Secret, Nuws);
+        claim(UWS, Secret, Env);
         claim(UWS, Alive);
         claim(UWS, Weakagree);
         claim(UWS, Niagree);
-        claim(UWS, Secret, Nu);
+        claim(UWS, Nisynch);
     }
 
     role SUB
     {
-        var   Nu: Nonce;
-        fresh Ns: Nonce;
+        var Nuws: Nonce;
+        var TS1, TS3: Timestamp;
+        var Env: Data;
+        fresh TS2: Timestamp;
 
-        recv_1(UWS, SUB, {h1a, UWS, Nu}pk(SUB));
-        send_2(SUB, UWS, {h1b, Nu, Ns, SUB}pk(UWS));
-        recv_3(UWS, SUB, {h1c, Ns}pk(SUB));
+        recv_1(UWS, SUB, {UWS, Nuws, TS1}pk(SUB));
+        send_2(SUB, UWS, {SUB, Nuws, TS2}pk(UWS));
+        recv_3(UWS, SUB, {SUB, Env, TS3}pk(SUB));
 
+        claim(SUB, Secret, Env);
         claim(SUB, Alive);
         claim(SUB, Weakagree);
         claim(SUB, Niagree);
-        claim(SUB, Secret, Ns);
+        claim(SUB, Nisynch);
     }
 }
 
-/* ===  HOP 2: SUB <-> BUOY  === */
-protocol uwchop2(SUB, BUOY)
+/* ---- IoT Sec. IV-C Steps 5-8: SUB <-> B, messages M4, M5, M6 -------------------------------------------- */
+protocol hop2(SUB, B)
 {
     role SUB
     {
-        fresh Ns: Nonce;
-        var   Nb: Nonce;
+        fresh Nsub: Nonce;
+        fresh TS4, TS6: Timestamp;
+        fresh Env, Alerts: Data;
+        var TS5: Timestamp;
 
-        send_1(SUB, BUOY, {h2a, SUB, Ns}pk(BUOY));
-        recv_2(BUOY, SUB, {h2b, Ns, Nb, BUOY}pk(SUB));
-        send_3(SUB, BUOY, {h2c, Nb}pk(BUOY));
+        send_4(SUB, B, {SUB, Nsub, TS4}pk(B));
+        recv_5(B, SUB, {B, Nsub, TS5}pk(SUB));
+        send_6(SUB, B, {B, Env, Alerts, TS6}pk(B));
 
+        claim(SUB, Secret, Nsub);
+        claim(SUB, Secret, Env);
+        claim(SUB, Secret, Alerts);
         claim(SUB, Alive);
         claim(SUB, Weakagree);
         claim(SUB, Niagree);
-        claim(SUB, Secret, Ns);
+        claim(SUB, Nisynch);
     }
 
-    role BUOY
+    role B
     {
-        var   Ns: Nonce;
-        fresh Nb: Nonce;
+        var Nsub: Nonce;
+        var TS4, TS6: Timestamp;
+        var Env, Alerts: Data;
+        fresh TS5: Timestamp;
 
-        recv_1(SUB, BUOY, {h2a, SUB, Ns}pk(BUOY));
-        send_2(BUOY, SUB, {h2b, Ns, Nb, BUOY}pk(SUB));
-        recv_3(SUB, BUOY, {h2c, Nb}pk(BUOY));
+        recv_4(SUB, B, {SUB, Nsub, TS4}pk(B));
+        send_5(B, SUB, {B, Nsub, TS5}pk(SUB));
+        recv_6(SUB, B, {B, Env, Alerts, TS6}pk(B));
 
-        claim(BUOY, Alive);
-        claim(BUOY, Weakagree);
-        claim(BUOY, Niagree);
-        claim(BUOY, Secret, Nb);
+        claim(B, Secret, Env);
+        claim(B, Secret, Alerts);
+        claim(B, Alive);
+        claim(B, Weakagree);
+        claim(B, Niagree);
+        claim(B, Nisynch);
     }
 }
 
-/* ===  HOP 3: BUOY <-> SAT  === */
-protocol uwchop3(BUOY, SAT)
+/* ---- IoT Sec. IV-C Steps 9-12: B <-> SAT, messages M7, M8, M9 -------------------------------------------- */
+protocol hop3(B, SAT)
 {
-    role BUOY
+    role B
     {
         fresh Nb: Nonce;
-        var   Nsat: Nonce;
+        fresh TS7, TS9: Timestamp;
+        fresh Env, Alerts, Gps: Data;
+        var TS8: Timestamp;
 
-        send_1(BUOY, SAT, {h3a, BUOY, Nb}pk(SAT));
-        recv_2(SAT, BUOY, {h3b, Nb, Nsat, SAT}pk(BUOY));
-        send_3(BUOY, SAT, {h3c, Nsat}pk(SAT));
+        send_7(B, SAT, {B, Nb, TS7}pk(SAT));
+        recv_8(SAT, B, {SAT, Nb, TS8}pk(B));
+        send_9(B, SAT, {SAT, Env, Alerts, Gps, TS9}pk(SAT));
 
-        claim(BUOY, Alive);
-        claim(BUOY, Weakagree);
-        claim(BUOY, Niagree);
-        claim(BUOY, Secret, Nb);
+        claim(B, Secret, Nb);
+        claim(B, Secret, Env);
+        claim(B, Secret, Alerts);
+        claim(B, Secret, Gps);
+        claim(B, Alive);
+        claim(B, Weakagree);
+        claim(B, Niagree);
+        claim(B, Nisynch);
     }
 
     role SAT
     {
-        var   Nb: Nonce;
-        fresh Nsat: Nonce;
+        var Nb: Nonce;
+        var TS7, TS9: Timestamp;
+        var Env, Alerts, Gps: Data;
+        fresh TS8: Timestamp;
 
-        recv_1(BUOY, SAT, {h3a, BUOY, Nb}pk(SAT));
-        send_2(SAT, BUOY, {h3b, Nb, Nsat, SAT}pk(BUOY));
-        recv_3(BUOY, SAT, {h3c, Nsat}pk(SAT));
+        recv_7(B, SAT, {B, Nb, TS7}pk(SAT));
+        send_8(SAT, B, {SAT, Nb, TS8}pk(B));
+        recv_9(B, SAT, {SAT, Env, Alerts, Gps, TS9}pk(SAT));
 
+        claim(SAT, Secret, Env);
+        claim(SAT, Secret, Alerts);
+        claim(SAT, Secret, Gps);
         claim(SAT, Alive);
         claim(SAT, Weakagree);
         claim(SAT, Niagree);
-        claim(SAT, Secret, Nsat);
+        claim(SAT, Nisynch);
     }
 }
 
-/* ===  HOP 4: SAT <-> BS  === */
-protocol uwchop4(SAT, BS)
+/* ---- IoT Sec. IV-C Steps 13-16: SAT <-> BS, messages M10, M11, M12 -------------------------------------------- */
+protocol hop4(SAT, BS)
 {
     role SAT
     {
         fresh Nsat: Nonce;
-        var   Nbs: Nonce;
+        fresh TS10, TS12: Timestamp;
+        fresh Env, Alerts, Gps, Logs: Data;
+        var TS11: Timestamp;
 
-        send_1(SAT, BS, {h4a, SAT, Nsat}pk(BS));
-        recv_2(BS, SAT, {h4b, Nsat, Nbs, BS}pk(SAT));
-        send_3(SAT, BS, {h4c, Nbs}pk(BS));
+        send_10(SAT, BS, {SAT, Nsat, TS10}pk(BS));
+        recv_11(BS, SAT, {BS, Nsat, TS11}pk(SAT));
+        send_12(SAT, BS, {BS, Env, Alerts, Gps, Logs, TS12}pk(BS));
 
+        claim(SAT, Secret, Nsat);
+        claim(SAT, Secret, Env);
+        claim(SAT, Secret, Alerts);
+        claim(SAT, Secret, Gps);
+        claim(SAT, Secret, Logs);
         claim(SAT, Alive);
         claim(SAT, Weakagree);
         claim(SAT, Niagree);
-        claim(SAT, Secret, Nsat);
+        claim(SAT, Nisynch);
     }
 
     role BS
     {
-        var   Nsat: Nonce;
-        fresh Nbs: Nonce;
+        var Nsat: Nonce;
+        var TS10, TS12: Timestamp;
+        var Env, Alerts, Gps, Logs: Data;
+        fresh TS11: Timestamp;
 
-        recv_1(SAT, BS, {h4a, SAT, Nsat}pk(BS));
-        send_2(BS, SAT, {h4b, Nsat, Nbs, BS}pk(SAT));
-        recv_3(SAT, BS, {h4c, Nbs}pk(BS));
+        recv_10(SAT, BS, {SAT, Nsat, TS10}pk(BS));
+        send_11(BS, SAT, {BS, Nsat, TS11}pk(SAT));
+        recv_12(SAT, BS, {BS, Env, Alerts, Gps, Logs, TS12}pk(BS));
 
+        claim(BS, Secret, Env);
+        claim(BS, Secret, Alerts);
+        claim(BS, Secret, Gps);
+        claim(BS, Secret, Logs);
         claim(BS, Alive);
         claim(BS, Weakagree);
         claim(BS, Niagree);
-        claim(BS, Secret, Nbs);
+        claim(BS, Nisynch);
     }
 }

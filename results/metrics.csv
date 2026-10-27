@@ -1,0 +1,741 @@
+metric,value
+mode,"HARDENED (deviation from [18]: random pentatope input x, K mod N, point validation, compressed points)"
+hardened,True
+seed,1
+library,C:\Users\Prasun\Desktop\Auth-Protocol-for-Secure-UWCN\peecc.dll
+c_bench_ms.keygen,1.1586120021343231
+c_bench_ms.encrypt_block,2.4149500036239626
+c_bench_ms.decrypt_block,1.1955759954452514
+chain.ok,True
+chain.latency_s,5.3091995263436065
+chain.messages,12
+chain.block_bits,528
+chain.compressed,True
+chain.k_bits,256
+chain.per_message[0].label,M1
+chain.per_message[0].src,UWS
+chain.per_message[0].dst,SUB
+chain.per_message[0].model_bits,136
+chain.per_message[0].wire_bits,528
+chain.per_message[1].label,M2
+chain.per_message[1].src,SUB
+chain.per_message[1].dst,UWS
+chain.per_message[1].model_bits,136
+chain.per_message[1].wire_bits,528
+chain.per_message[2].label,M3
+chain.per_message[2].src,UWS
+chain.per_message[2].dst,SUB
+chain.per_message[2].model_bits,200
+chain.per_message[2].wire_bits,528
+chain.per_message[3].label,M4
+chain.per_message[3].src,SUB
+chain.per_message[3].dst,B
+chain.per_message[3].model_bits,136
+chain.per_message[3].wire_bits,528
+chain.per_message[4].label,M5
+chain.per_message[4].src,B
+chain.per_message[4].dst,SUB
+chain.per_message[4].model_bits,136
+chain.per_message[4].wire_bits,528
+chain.per_message[5].label,M6
+chain.per_message[5].src,SUB
+chain.per_message[5].dst,B
+chain.per_message[5].model_bits,392
+chain.per_message[5].wire_bits,1056
+chain.per_message[6].label,M7
+chain.per_message[6].src,B
+chain.per_message[6].dst,SAT
+chain.per_message[6].model_bits,136
+chain.per_message[6].wire_bits,528
+chain.per_message[7].label,M8
+chain.per_message[7].src,SAT
+chain.per_message[7].dst,B
+chain.per_message[7].model_bits,136
+chain.per_message[7].wire_bits,528
+chain.per_message[8].label,M9
+chain.per_message[8].src,B
+chain.per_message[8].dst,SAT
+chain.per_message[8].model_bits,456
+chain.per_message[8].wire_bits,1056
+chain.per_message[9].label,M10
+chain.per_message[9].src,SAT
+chain.per_message[9].dst,BS
+chain.per_message[9].model_bits,136
+chain.per_message[9].wire_bits,528
+chain.per_message[10].label,M11
+chain.per_message[10].src,BS
+chain.per_message[10].dst,SAT
+chain.per_message[10].model_bits,136
+chain.per_message[10].wire_bits,528
+chain.per_message[11].label,M12
+chain.per_message[11].src,SAT
+chain.per_message[11].dst,BS
+chain.per_message[11].model_bits,584
+chain.per_message[11].wire_bits,1584
+chain.model_bits,2720
+chain.auth_only_bits,1088
+chain.wire_bits,8448
+chain.registration_bits_each,832
+chain.model_tx_ms,272.0
+chain.wire_tx_ms,844.8
+chain.per_hop.SUB-UWS.prop_s,0.1472852131341074
+chain.per_hop.SUB-UWS.tx_s,0.15839999999999999
+chain.per_hop.B-SUB.prop_s,0.5751269088290063
+chain.per_hop.B-SUB.tx_s,0.2112
+chain.per_hop.B-SAT.prop_s,0.5249314380526351
+chain.per_hop.B-SAT.tx_s,0.2112
+chain.per_hop.BS-SAT.prop_s,0.2197080821103197
+chain.per_hop.BS-SAT.tx_s,0.264
+chain.entities.UWS.ecc_mul,6
+chain.entities.UWS.ecc_bits,1536
+chain.entities.UWS.hash,4
+chain.entities.UWS.enc,2
+chain.entities.UWS.dec,1
+chain.entities.UWS.compute_ms,8.984
+chain.entities.UWS.energy_uj,177.6
+chain.entities.UWS.energy_flat_uj,177.6
+chain.entities.UWS.storage_bytes,20
+chain.entities.UWS.sessions,1
+chain.entities.SUB.ecc_mul,12
+chain.entities.SUB.ecc_bits,3072
+chain.entities.SUB.hash,7
+chain.entities.SUB.enc,3
+chain.entities.SUB.dec,3
+chain.entities.SUB.compute_ms,15.088
+chain.entities.SUB.energy_uj,349.2
+chain.entities.SUB.energy_flat_uj,349.2
+chain.entities.SUB.storage_bytes,40
+chain.entities.SUB.sessions,2
+chain.entities.B.ecc_mul,13
+chain.entities.B.ecc_bits,3328
+chain.entities.B.hash,7
+chain.entities.B.enc,3
+chain.entities.B.dec,3
+chain.entities.B.compute_ms,16.495
+chain.entities.B.energy_uj,373.2
+chain.entities.B.energy_flat_uj,373.2
+chain.entities.B.storage_bytes,40
+chain.entities.B.sessions,2
+chain.entities.SAT.ecc_mul,15
+chain.entities.SAT.ecc_bits,3840
+chain.entities.SAT.hash,7
+chain.entities.SAT.enc,3
+chain.entities.SAT.dec,3
+chain.entities.SAT.compute_ms,20.549
+chain.entities.SAT.energy_uj,421.2
+chain.entities.SAT.energy_flat_uj,421.2
+chain.entities.SAT.storage_bytes,40
+chain.entities.SAT.sessions,2
+chain.entities.BS.ecc_mul,7
+chain.entities.BS.ecc_bits,1792
+chain.entities.BS.hash,4
+chain.entities.BS.enc,1
+chain.entities.BS.dec,2
+chain.entities.BS.compute_ms,9.891
+chain.entities.BS.energy_uj,201.6
+chain.entities.BS.energy_flat_uj,201.6
+chain.entities.BS.storage_bytes,20
+chain.entities.BS.sessions,1
+chain.sessions,8
+fig1_storage.S1.storage_bytes,40
+fig1_storage.S1.peers,2
+fig1_storage.S2.storage_bytes,40
+fig1_storage.S2.peers,2
+fig1_storage.S3.storage_bytes,40
+fig1_storage.S3.peers,2
+fig1_storage.S4.storage_bytes,40
+fig1_storage.S4.peers,2
+fig1_storage.S5.storage_bytes,40
+fig1_storage.S5.peers,2
+fig1_storage.S6.storage_bytes,40
+fig1_storage.S6.peers,2
+fig1_storage.S7.storage_bytes,40
+fig1_storage.S7.peers,2
+fig1_storage.S8.storage_bytes,40
+fig1_storage.S8.peers,2
+fig1_storage.S9.storage_bytes,40
+fig1_storage.S9.peers,2
+fig1_storage.S10.storage_bytes,40
+fig1_storage.S10.peers,2
+fig1_storage.S11.storage_bytes,40
+fig1_storage.S11.peers,2
+fig1_storage.S12.storage_bytes,40
+fig1_storage.S12.peers,2
+fig1_storage.S13.storage_bytes,40
+fig1_storage.S13.peers,2
+fig1_storage.S14.storage_bytes,40
+fig1_storage.S14.peers,2
+fig1_storage.S15.storage_bytes,40
+fig1_storage.S15.peers,2
+fig1_storage.S16.storage_bytes,40
+fig1_storage.S16.peers,2
+fig1_storage.S17.storage_bytes,40
+fig1_storage.S17.peers,2
+fig1_storage.S18.storage_bytes,40
+fig1_storage.S18.peers,2
+fig1_storage.SB1.storage_bytes,160
+fig1_storage.SB1.peers,8
+fig1_storage.SB2.storage_bytes,160
+fig1_storage.SB2.peers,8
+fig1_storage.SB3.storage_bytes,160
+fig1_storage.SB3.peers,8
+fig1_storage.SB4.storage_bytes,160
+fig1_storage.SB4.peers,8
+fig1_storage.SB5.storage_bytes,160
+fig1_storage.SB5.peers,8
+fig1_storage.SB6.storage_bytes,160
+fig1_storage.SB6.peers,8
+fig1_storage.B1.storage_bytes,120
+fig1_storage.B1.peers,6
+fig1_storage.B2.storage_bytes,120
+fig1_storage.B2.peers,6
+fig1_storage.B3.storage_bytes,120
+fig1_storage.B3.peers,6
+fig1_storage.SAT1.storage_bytes,60
+fig1_storage.SAT1.peers,3
+fig1_storage.SAT2.storage_bytes,60
+fig1_storage.SAT2.peers,3
+fig1_storage.SAT3.storage_bytes,60
+fig1_storage.SAT3.peers,3
+fig1_storage.BS.storage_bytes,60
+fig1_storage.BS.peers,3
+attacks.paper-exact[0].name,replay of M1 (within dT)
+attacks.paper-exact[0].detected,True
+attacks.paper-exact[0].detail,nonce already used (replay)
+attacks.paper-exact[1].name,delay injection (M1 held 4 s)
+attacks.paper-exact[1].detected,True
+attacks.paper-exact[1].detail,stale timestamp (4.25 s >= 2.00 s)
+attacks.paper-exact[2].name,"delay injection (held 12.8 s, TS wraps)"
+attacks.paper-exact[2].detected,False
+attacks.paper-exact[2].detail,accepted: 8-bit TS wrapped and the nonce was never used (paper gap)
+attacks.paper-exact[3].name,impersonate SUB to UWS (wrong key)
+attacks.paper-exact[3].detected,False
+attacks.paper-exact[3].detail,own key: cannot decrypt; K-public: read the nonce; S1: ok
+attacks.paper-exact[4].name,impersonate UWS to SUB (inject M1+M3)
+attacks.paper-exact[4].detected,False
+attacks.paper-exact[4].detail,"M1 accepted, fake M3 accepted: no proof of PK_UWS in M1 (protocol gap)"
+attacks.paper-exact[5].name,tampered registration (PU swapped)
+attacks.paper-exact[5].detected,True
+attacks.paper-exact[5].detail,status INVALID
+attacks.paper-exact[6].name,duplicate RID
+attacks.paper-exact[6].detected,True
+attacks.paper-exact[6].detail,"first VALID, second DUPLICATE"
+attacks.paper-exact[7].name,"rogue registration (own key, valid v)"
+attacks.paper-exact[7].detected,True
+attacks.paper-exact[7].detail,"status UNKNOWN (directory check, IoT IV-E-3)"
+attacks.paper-exact[8].name,revoked node S7 authenticates
+attacks.paper-exact[8].detected,True
+attacks.paper-exact[8].detail,ID on revocation list
+attacks.paper-exact[9].name,forged revocation list (revoke SB1)
+attacks.paper-exact[9].detected,True
+attacks.paper-exact[9].detail,tag check failed
+attacks.paper-exact[10].name,K-public eavesdropping (M1-M12)
+attacks.paper-exact[10].detected,False
+attacks.paper-exact[10].detail,keyless attacker read 12 of 12 messages
+attacks.hardened[0].name,replay of M1 (within dT)
+attacks.hardened[0].detected,True
+attacks.hardened[0].detail,nonce already used (replay)
+attacks.hardened[1].name,delay injection (M1 held 4 s)
+attacks.hardened[1].detected,True
+attacks.hardened[1].detail,stale timestamp (4.20 s >= 2.00 s)
+attacks.hardened[2].name,"delay injection (held 12.8 s, TS wraps)"
+attacks.hardened[2].detected,False
+attacks.hardened[2].detail,accepted: 8-bit TS wrapped and the nonce was never used (paper gap)
+attacks.hardened[3].name,impersonate SUB to UWS (wrong key)
+attacks.hardened[3].detected,True
+attacks.hardened[3].detail,own key: cannot decrypt; K-public: failed; S1: nonce mismatch
+attacks.hardened[4].name,impersonate UWS to SUB (inject M1+M3)
+attacks.hardened[4].detected,False
+attacks.hardened[4].detail,"M1 accepted, fake M3 accepted: no proof of PK_UWS in M1 (protocol gap)"
+attacks.hardened[5].name,tampered registration (PU swapped)
+attacks.hardened[5].detected,True
+attacks.hardened[5].detail,status INVALID
+attacks.hardened[6].name,duplicate RID
+attacks.hardened[6].detected,True
+attacks.hardened[6].detail,"first VALID, second DUPLICATE"
+attacks.hardened[7].name,"rogue registration (own key, valid v)"
+attacks.hardened[7].detected,True
+attacks.hardened[7].detail,"status UNKNOWN (directory check, IoT IV-E-3)"
+attacks.hardened[8].name,revoked node S7 authenticates
+attacks.hardened[8].detected,True
+attacks.hardened[8].detail,ID on revocation list
+attacks.hardened[9].name,forged revocation list (revoke SB1)
+attacks.hardened[9].detected,True
+attacks.hardened[9].detail,tag check failed
+attacks.hardened[10].name,K-public eavesdropping (M1-M12)
+attacks.hardened[10].detected,True
+attacks.hardened[10].detail,keyless attacker read 0 of 12 messages
+fallback.buoy_down.peer,B2
+fallback.buoy_down.ok,True
+fallback.buoy_down.seconds,4.050250332900581
+fallback.sat_delayed.peer,SAT2
+fallback.sat_delayed.ok,True
+fallback.sat_delayed.seconds,6.872726784889256
+fallback.mobile_reauth.peer,SB2
+fallback.mobile_reauth.ok,True
+fallback.mobile_reauth.seconds,1.8937856264172277
+fallback.mobile_reauth.compute_ms,10.004899930208921
+scale[0].series,nodes
+scale[0].nodes,10
+scale[0].depth,5
+scale[0].end_to_end,8.660852290385286
+scale[0].mean_leaf,8.660852290385286
+scale[0].messages,27
+scale[0].bits,16368
+scale[1].series,nodes
+scale[1].nodes,25
+scale[1].depth,5
+scale[1].end_to_end,11.861330341894476
+scale[1].mean_leaf,11.861330341894476
+scale[1].messages,72
+scale[1].bits,42768
+scale[2].series,nodes
+scale[2].nodes,50
+scale[2].depth,5
+scale[2].end_to_end,15.76706870706788
+scale[2].mean_leaf,14.596657271170093
+scale[2].messages,147
+scale[2].bits,87648
+scale[3].series,nodes
+scale[3].nodes,100
+scale[3].depth,5
+scale[3].end_to_end,16.616079137200995
+scale[3].mean_leaf,14.263139749305079
+scale[3].messages,297
+scale[3].bits,176880
+scale[4].series,nodes
+scale[4].nodes,200
+scale[4].depth,5
+scale[4].end_to_end,22.541278147656733
+scale[4].mean_leaf,16.63799896564685
+scale[4].messages,597
+scale[4].bits,355872
+scale[5].series,"depth, 100 nodes"
+scale[5].nodes,100
+scale[5].depth,2
+scale[5].end_to_end,128.1487138135134
+scale[5].mean_leaf,61.963584948332034
+scale[5].messages,297
+scale[5].bits,156816
+scale[6].series,"depth, 100 nodes"
+scale[6].nodes,100
+scale[6].depth,3
+scale[6].end_to_end,38.08269183733434
+scale[6].mean_leaf,20.436075479515058
+scale[6].messages,297
+scale[6].bits,171600
+scale[7].series,"depth, 100 nodes"
+scale[7].nodes,100
+scale[7].depth,4
+scale[7].end_to_end,19.796368585702247
+scale[7].mean_leaf,13.780384755010443
+scale[7].messages,297
+scale[7].bits,175296
+scale[8].series,"depth, 100 nodes"
+scale[8].nodes,100
+scale[8].depth,5
+scale[8].end_to_end,16.612099736876825
+scale[8].mean_leaf,14.253118414711857
+scale[8].messages,297
+scale[8].bits,176880
+scale[9].series,"depth, fan-out 3"
+scale[9].nodes,4
+scale[9].depth,2
+scale[9].end_to_end,4.269645280086147
+scale[9].mean_leaf,2.4683388951647958
+scale[9].messages,9
+scale[9].bits,4752
+scale[10].series,"depth, fan-out 3"
+scale[10].nodes,13
+scale[10].depth,3
+scale[10].end_to_end,8.672723216764359
+scale[10].mean_leaf,6.336409337795268
+scale[10].messages,36
+scale[10].bits,20592
+scale[11].series,"depth, fan-out 3"
+scale[11].nodes,40
+scale[11].depth,4
+scale[11].end_to_end,12.072627080053547
+scale[11].mean_leaf,9.956795050150852
+scale[11].messages,117
+scale[11].bits,68112
+scale[12].series,"depth, fan-out 3"
+scale[12].nodes,121
+scale[12].depth,5
+scale[12].end_to_end,18.147607974485826
+scale[12].mean_leaf,15.334758579384964
+scale[12].messages,360
+scale[12].bits,210672
+scyther.seconds,14.4768967628479
+scyther.claims[0].protocol,"uwcreg,I"
+scyther.claims[0].claim,Secret_I1
+scyther.claims[0].param,sk(I)
+scyther.claims[0].result,Ok
+scyther.claims[0].note,[proof of correctness]
+scyther.claims[1].protocol,"uwcreg,J"
+scyther.claims[1].claim,Alive_J1
+scyther.claims[1].param,-
+scyther.claims[1].result,Fail
+scyther.claims[1].note,[at least 1 attack]
+scyther.claims[2].protocol,"hop1,UWS"
+scyther.claims[2].claim,Secret_UWS1
+scyther.claims[2].param,Nuws
+scyther.claims[2].result,Ok
+scyther.claims[2].note,[no attack within bounds]
+scyther.claims[3].protocol,"hop1,UWS"
+scyther.claims[3].claim,Secret_UWS2
+scyther.claims[3].param,Env
+scyther.claims[3].result,Ok
+scyther.claims[3].note,[no attack within bounds]
+scyther.claims[4].protocol,"hop1,UWS"
+scyther.claims[4].claim,Alive_UWS3
+scyther.claims[4].param,-
+scyther.claims[4].result,Ok
+scyther.claims[4].note,[no attack within bounds]
+scyther.claims[5].protocol,"hop1,UWS"
+scyther.claims[5].claim,Weakagree_UWS4
+scyther.claims[5].param,-
+scyther.claims[5].result,Ok
+scyther.claims[5].note,[no attack within bounds]
+scyther.claims[6].protocol,"hop1,UWS"
+scyther.claims[6].claim,Niagree_UWS5
+scyther.claims[6].param,-
+scyther.claims[6].result,Fail
+scyther.claims[6].note,[at least 4 attacks]
+scyther.claims[7].protocol,"hop1,UWS"
+scyther.claims[7].claim,Nisynch_UWS6
+scyther.claims[7].param,-
+scyther.claims[7].result,Fail
+scyther.claims[7].note,[at least 4 attacks]
+scyther.claims[8].protocol,"hop1,SUB"
+scyther.claims[8].claim,Secret_SUB1
+scyther.claims[8].param,Env
+scyther.claims[8].result,Fail
+scyther.claims[8].note,[at least 10 attacks]
+scyther.claims[9].protocol,"hop1,SUB"
+scyther.claims[9].claim,Alive_SUB2
+scyther.claims[9].param,-
+scyther.claims[9].result,Fail
+scyther.claims[9].note,[at least 6 attacks]
+scyther.claims[10].protocol,"hop1,SUB"
+scyther.claims[10].claim,Weakagree_SUB3
+scyther.claims[10].param,-
+scyther.claims[10].result,Fail
+scyther.claims[10].note,[at least 6 attacks]
+scyther.claims[11].protocol,"hop1,SUB"
+scyther.claims[11].claim,Niagree_SUB4
+scyther.claims[11].param,-
+scyther.claims[11].result,Fail
+scyther.claims[11].note,[at least 9 attacks]
+scyther.claims[12].protocol,"hop1,SUB"
+scyther.claims[12].claim,Nisynch_SUB5
+scyther.claims[12].param,-
+scyther.claims[12].result,Fail
+scyther.claims[12].note,[at least 9 attacks]
+scyther.claims[13].protocol,"hop2,SUB"
+scyther.claims[13].claim,Secret_SUB1
+scyther.claims[13].param,Nsub
+scyther.claims[13].result,Ok
+scyther.claims[13].note,[no attack within bounds]
+scyther.claims[14].protocol,"hop2,SUB"
+scyther.claims[14].claim,Secret_SUB2
+scyther.claims[14].param,Env
+scyther.claims[14].result,Ok
+scyther.claims[14].note,[no attack within bounds]
+scyther.claims[15].protocol,"hop2,SUB"
+scyther.claims[15].claim,Secret_SUB3
+scyther.claims[15].param,Alerts
+scyther.claims[15].result,Ok
+scyther.claims[15].note,[no attack within bounds]
+scyther.claims[16].protocol,"hop2,SUB"
+scyther.claims[16].claim,Alive_SUB4
+scyther.claims[16].param,-
+scyther.claims[16].result,Ok
+scyther.claims[16].note,[no attack within bounds]
+scyther.claims[17].protocol,"hop2,SUB"
+scyther.claims[17].claim,Weakagree_SUB5
+scyther.claims[17].param,-
+scyther.claims[17].result,Ok
+scyther.claims[17].note,[no attack within bounds]
+scyther.claims[18].protocol,"hop2,SUB"
+scyther.claims[18].claim,Niagree_SUB6
+scyther.claims[18].param,-
+scyther.claims[18].result,Fail
+scyther.claims[18].note,[at least 4 attacks]
+scyther.claims[19].protocol,"hop2,SUB"
+scyther.claims[19].claim,Nisynch_SUB7
+scyther.claims[19].param,-
+scyther.claims[19].result,Fail
+scyther.claims[19].note,[at least 4 attacks]
+scyther.claims[20].protocol,"hop2,B"
+scyther.claims[20].claim,Secret_B1
+scyther.claims[20].param,Env
+scyther.claims[20].result,Fail
+scyther.claims[20].note,[at least 10 attacks]
+scyther.claims[21].protocol,"hop2,B"
+scyther.claims[21].claim,Secret_B2
+scyther.claims[21].param,Alerts
+scyther.claims[21].result,Fail
+scyther.claims[21].note,[at least 10 attacks]
+scyther.claims[22].protocol,"hop2,B"
+scyther.claims[22].claim,Alive_B3
+scyther.claims[22].param,-
+scyther.claims[22].result,Fail
+scyther.claims[22].note,[at least 6 attacks]
+scyther.claims[23].protocol,"hop2,B"
+scyther.claims[23].claim,Weakagree_B4
+scyther.claims[23].param,-
+scyther.claims[23].result,Fail
+scyther.claims[23].note,[at least 6 attacks]
+scyther.claims[24].protocol,"hop2,B"
+scyther.claims[24].claim,Niagree_B5
+scyther.claims[24].param,-
+scyther.claims[24].result,Fail
+scyther.claims[24].note,[at least 9 attacks]
+scyther.claims[25].protocol,"hop2,B"
+scyther.claims[25].claim,Nisynch_B6
+scyther.claims[25].param,-
+scyther.claims[25].result,Fail
+scyther.claims[25].note,[at least 9 attacks]
+scyther.claims[26].protocol,"hop3,B"
+scyther.claims[26].claim,Secret_B1
+scyther.claims[26].param,Nb
+scyther.claims[26].result,Ok
+scyther.claims[26].note,[no attack within bounds]
+scyther.claims[27].protocol,"hop3,B"
+scyther.claims[27].claim,Secret_B2
+scyther.claims[27].param,Env
+scyther.claims[27].result,Ok
+scyther.claims[27].note,[no attack within bounds]
+scyther.claims[28].protocol,"hop3,B"
+scyther.claims[28].claim,Secret_B3
+scyther.claims[28].param,Alerts
+scyther.claims[28].result,Ok
+scyther.claims[28].note,[no attack within bounds]
+scyther.claims[29].protocol,"hop3,B"
+scyther.claims[29].claim,Secret_B4
+scyther.claims[29].param,Gps
+scyther.claims[29].result,Ok
+scyther.claims[29].note,[no attack within bounds]
+scyther.claims[30].protocol,"hop3,B"
+scyther.claims[30].claim,Alive_B5
+scyther.claims[30].param,-
+scyther.claims[30].result,Ok
+scyther.claims[30].note,[no attack within bounds]
+scyther.claims[31].protocol,"hop3,B"
+scyther.claims[31].claim,Weakagree_B6
+scyther.claims[31].param,-
+scyther.claims[31].result,Ok
+scyther.claims[31].note,[no attack within bounds]
+scyther.claims[32].protocol,"hop3,B"
+scyther.claims[32].claim,Niagree_B7
+scyther.claims[32].param,-
+scyther.claims[32].result,Fail
+scyther.claims[32].note,[at least 4 attacks]
+scyther.claims[33].protocol,"hop3,B"
+scyther.claims[33].claim,Nisynch_B8
+scyther.claims[33].param,-
+scyther.claims[33].result,Fail
+scyther.claims[33].note,[at least 4 attacks]
+scyther.claims[34].protocol,"hop3,SAT"
+scyther.claims[34].claim,Secret_SAT1
+scyther.claims[34].param,Env
+scyther.claims[34].result,Fail
+scyther.claims[34].note,[at least 10 attacks]
+scyther.claims[35].protocol,"hop3,SAT"
+scyther.claims[35].claim,Secret_SAT2
+scyther.claims[35].param,Alerts
+scyther.claims[35].result,Fail
+scyther.claims[35].note,[at least 10 attacks]
+scyther.claims[36].protocol,"hop3,SAT"
+scyther.claims[36].claim,Secret_SAT3
+scyther.claims[36].param,Gps
+scyther.claims[36].result,Fail
+scyther.claims[36].note,[at least 10 attacks]
+scyther.claims[37].protocol,"hop3,SAT"
+scyther.claims[37].claim,Alive_SAT4
+scyther.claims[37].param,-
+scyther.claims[37].result,Fail
+scyther.claims[37].note,[at least 6 attacks]
+scyther.claims[38].protocol,"hop3,SAT"
+scyther.claims[38].claim,Weakagree_SAT5
+scyther.claims[38].param,-
+scyther.claims[38].result,Fail
+scyther.claims[38].note,[at least 6 attacks]
+scyther.claims[39].protocol,"hop3,SAT"
+scyther.claims[39].claim,Niagree_SAT6
+scyther.claims[39].param,-
+scyther.claims[39].result,Fail
+scyther.claims[39].note,[at least 9 attacks]
+scyther.claims[40].protocol,"hop3,SAT"
+scyther.claims[40].claim,Nisynch_SAT7
+scyther.claims[40].param,-
+scyther.claims[40].result,Fail
+scyther.claims[40].note,[at least 9 attacks]
+scyther.claims[41].protocol,"hop4,SAT"
+scyther.claims[41].claim,Secret_SAT1
+scyther.claims[41].param,Nsat
+scyther.claims[41].result,Ok
+scyther.claims[41].note,[no attack within bounds]
+scyther.claims[42].protocol,"hop4,SAT"
+scyther.claims[42].claim,Secret_SAT2
+scyther.claims[42].param,Env
+scyther.claims[42].result,Ok
+scyther.claims[42].note,[no attack within bounds]
+scyther.claims[43].protocol,"hop4,SAT"
+scyther.claims[43].claim,Secret_SAT3
+scyther.claims[43].param,Alerts
+scyther.claims[43].result,Ok
+scyther.claims[43].note,[no attack within bounds]
+scyther.claims[44].protocol,"hop4,SAT"
+scyther.claims[44].claim,Secret_SAT4
+scyther.claims[44].param,Gps
+scyther.claims[44].result,Ok
+scyther.claims[44].note,[no attack within bounds]
+scyther.claims[45].protocol,"hop4,SAT"
+scyther.claims[45].claim,Secret_SAT5
+scyther.claims[45].param,Logs
+scyther.claims[45].result,Ok
+scyther.claims[45].note,[no attack within bounds]
+scyther.claims[46].protocol,"hop4,SAT"
+scyther.claims[46].claim,Alive_SAT6
+scyther.claims[46].param,-
+scyther.claims[46].result,Ok
+scyther.claims[46].note,[no attack within bounds]
+scyther.claims[47].protocol,"hop4,SAT"
+scyther.claims[47].claim,Weakagree_SAT7
+scyther.claims[47].param,-
+scyther.claims[47].result,Ok
+scyther.claims[47].note,[no attack within bounds]
+scyther.claims[48].protocol,"hop4,SAT"
+scyther.claims[48].claim,Niagree_SAT8
+scyther.claims[48].param,-
+scyther.claims[48].result,Fail
+scyther.claims[48].note,[at least 3 attacks]
+scyther.claims[49].protocol,"hop4,SAT"
+scyther.claims[49].claim,Nisynch_SAT9
+scyther.claims[49].param,-
+scyther.claims[49].result,Fail
+scyther.claims[49].note,[at least 3 attacks]
+scyther.claims[50].protocol,"hop4,BS"
+scyther.claims[50].claim,Secret_BS1
+scyther.claims[50].param,Env
+scyther.claims[50].result,Fail
+scyther.claims[50].note,[at least 10 attacks]
+scyther.claims[51].protocol,"hop4,BS"
+scyther.claims[51].claim,Secret_BS2
+scyther.claims[51].param,Alerts
+scyther.claims[51].result,Fail
+scyther.claims[51].note,[at least 10 attacks]
+scyther.claims[52].protocol,"hop4,BS"
+scyther.claims[52].claim,Secret_BS3
+scyther.claims[52].param,Gps
+scyther.claims[52].result,Fail
+scyther.claims[52].note,[at least 10 attacks]
+scyther.claims[53].protocol,"hop4,BS"
+scyther.claims[53].claim,Secret_BS4
+scyther.claims[53].param,Logs
+scyther.claims[53].result,Fail
+scyther.claims[53].note,[at least 10 attacks]
+scyther.claims[54].protocol,"hop4,BS"
+scyther.claims[54].claim,Alive_BS5
+scyther.claims[54].param,-
+scyther.claims[54].result,Fail
+scyther.claims[54].note,[at least 6 attacks]
+scyther.claims[55].protocol,"hop4,BS"
+scyther.claims[55].claim,Weakagree_BS6
+scyther.claims[55].param,-
+scyther.claims[55].result,Fail
+scyther.claims[55].note,[at least 6 attacks]
+scyther.claims[56].protocol,"hop4,BS"
+scyther.claims[56].claim,Niagree_BS7
+scyther.claims[56].param,-
+scyther.claims[56].result,Fail
+scyther.claims[56].note,[at least 7 attacks]
+scyther.claims[57].protocol,"hop4,BS"
+scyther.claims[57].claim,Nisynch_BS8
+scyther.claims[57].param,-
+scyther.claims[57].result,Fail
+scyther.claims[57].note,[at least 7 attacks]
+scyther.ok,23
+scyther.fail,35
+claims[0].claim,Total communication cost (paper model)
+claims[0].paper,2112 bit
+claims[0].measured,2720 bit (handshakes only: 1088)
+claims[0].status,FAIL
+claims[0].reason,"derived candidate 4 x (136+136+256); our M1/M2-type messages are 136 bit each as assumed, but the paper does not give data-message sizes, so our M3/M6/M9/M12 encodings differ"
+claims[1].claim,30-34% reduction vs 3008-3216 bit
+claims[1].paper,30-34 %
+claims[1].measured,29.8-34.3 % (paper's own numbers); ours vs baselines 9.6-15.4 %
+claims[1].status,PASS
+claims[1].reason,arithmetic from the paper's figures; 29.8 % rounds to 30 %
+claims[2].claim,Transmission time of 2112 bit at 10 kbps
+claims[2].paper,211 ms
+claims[2].measured,"272 ms model, 845 ms on the wire"
+claims[2].status,FAIL
+claims[2].reason,"the paper counts plaintext fields; every PEECC block on the wire is 528 bit (C1, C2, compressed points), 8448 bit in total"
+claims[3].claim,Computation per entity: UWS
+claims[3].paper,0.400 ms
+claims[3].measured,"8.984 ms (measured, incl. keygen)"
+claims[3].status,FAIL
+claims[3].reason,measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms
+claims[4].claim,Computation per entity: SUB
+claims[4].paper,0.500 ms
+claims[4].measured,"15.088 ms (measured, incl. keygen)"
+claims[4].status,FAIL
+claims[4].reason,measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms
+claims[5].claim,Computation per entity: B
+claims[5].paper,0.500 ms
+claims[5].measured,"16.495 ms (measured, incl. keygen)"
+claims[5].status,FAIL
+claims[5].reason,measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms
+claims[6].claim,Computation per entity: SAT
+claims[6].paper,0.500 ms
+claims[6].measured,"20.549 ms (measured, incl. keygen)"
+claims[6].status,FAIL
+claims[6].reason,measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms
+claims[7].claim,Computation per entity: BS
+claims[7].paper,0.400 ms
+claims[7].measured,"9.891 ms (measured, incl. keygen)"
+claims[7].status,FAIL
+claims[7].reason,measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms
+claims[8].claim,UWS energy per authentication
+claims[8].paper,48.8 uJ
+claims[8].measured,"177.6 uJ (6 ECC mult, 4 hash, 2 enc, 1 dec; flat model 177.6 uJ)"
+claims[8].status,FAIL
+claims[8].reason,"paper's per-operation energies, ECC charged per 256 scalar bits (K has 256 bits in this mode); PEECC needs 2 ECC multiplications per encrypted block and 1 per decryption, the paper counts 1 ECC and charges encryption at the AES rate"
+claims[9].claim,Mobile re-authentication (M1-M3)
+claims[9].paper,< 1 ms
+claims[9].measured,"10.005 ms computation, 1.894 s incl. acoustic links"
+claims[9].status,FAIL
+claims[9].reason,computation measured; the paper's figure ignores propagation and transmission
+claims[10].claim,Registry storage of a UWS (< 10 peers)
+claims[10].paper,< 250 B
+claims[10].measured,40 B (20 B per RID)
+claims[10].status,PASS
+claims[10].reason,
+claims[11].claim,Attacks detected (paper-exact)
+claims[11].paper,all
+claims[11].measured,7 of 11
+claims[11].status,FAIL
+claims[11].reason,"delay injection (held 12.8 s, TS wraps); impersonate SUB to UWS (wrong key); impersonate UWS to SUB (inject M1+M3); K-public eavesdropping (M1-M12)"
+claims[12].claim,Attacks detected (hardened)
+claims[12].paper,all
+claims[12].measured,9 of 11
+claims[12].status,FAIL
+claims[12].reason,"delay injection (held 12.8 s, TS wraps); impersonate UWS to SUB (inject M1+M3)"
+claims[13].claim,Scyther: all claims verified (Fig. 6)
+claims[13].paper,all Ok
+claims[13].measured,"23 Ok, 35 Fail"
+claims[13].status,FAIL
+claims[13].reason,responder-side claims fail: M1/M4/M7/M10 contain nothing only the initiator can produce
+claims[14].claim,Delay grows linearly with depth
+claims[14].paper,linear
+claims[14].measured,"fan-out 3: 4.22 s/level, R^2 = 0.991"
+claims[14].status,PASS
+claims[14].reason,"constant fan-out 3, depth 2-5 (4-121 nodes). With a fixed 100 nodes the trend reverses (-14.98 s/level, R^2 = 0.701): shallow trees put many children on one parent's modem"
+claims[15].claim,5-D curve overhead 1.3x of 2-D
+claims[15].paper,1.3x
+claims[15].measured,not measured
+claims[15].status,N.A.
+claims[15].reason,implementation is 2-D ([18]); no 5-D arithmetic exists

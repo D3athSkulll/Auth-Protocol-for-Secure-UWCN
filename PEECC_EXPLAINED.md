@@ -49,7 +49,8 @@ The real program does exactly these formulas, only with 256-bit numbers.
 Add `P` to itself `k` times. With `k` around 2^256 we cannot loop that long, so we use **double-and-add**: read the
 binary digits of `k` from the left; for each digit, *double* the running total, and if the digit is 1, *add* `P`.
 Example `k = 13 = 1101` in binary: start 0 → bit 1: double(0)+P = P → bit 1: 2P+P = 3P → bit 0: 6P → bit 1: 12P+P = 13P.
-About 256 doublings + 128 additions instead of 2^256 steps.
+For a 256-bit `k`: about 256 doublings + 128 additions instead of 2^256 steps. (The paper's 2029-bit `K` needs 2028 doublings
+and 1038 additions, which is why paper-exact encryption is slow.)
 
 ### 2.5 Why this is public-key crypto
 * Private key `d` = a random big number.
@@ -96,8 +97,9 @@ typedef struct { mpz_t x, y; int inf; } Pt;
   variable must be `mpz_init`-ed before use and `mpz_clear`-ed after (otherwise memory leaks).
 * **`Pt`** = a curve point. `inf = 1` means the **point at infinity**, the "zero" of point addition (`P + inf = P`). It is
   needed for cases like `P + (-P)`, which equals infinity.
-* **`MAX_MSG = 29`**: the x-coordinate must stay below `p` (256 bits). We store `0x01 + message` (see 3.7) times 256, so
-  `(1 + 29 bytes) * 8 + 8 = 248 bits < 256`. Thirty bytes could overflow, so 29 is the largest safe size.
+* **`MAX_MSG = 29`**: the x-coordinate must stay below `p` (256 bits). We store `0x01 + message` (see 3.7) times 256.
+  The marker byte `0x01` contributes only 1 bit, so 29 bytes give `x < 2^(1 + 29*8 + 8) = 2^241`, far below `p`.
+  29 is a conservative choice: 30 bytes (`x < 2^249`) would also fit; 31 bytes (`x < 2^257`) could exceed `p`.
 * **`KAPPA = 256`**: Koblitz's trial count. Each `j` works with chance ~1/2, so failing all 256 tries has chance 2^-256 (never).
 
 Globals: `P` (prime), `A`, `Bc` (curve `a` and `b`; named `Bc` so it does not clash with the generator `B`), `N` (order), `G` (generator B).
@@ -157,13 +159,19 @@ almost never has this structure.)
 ### 3.8 The three PEECC operations
 
 ```c
-static void keygen(mpz_t d, Pt *pub)                       // Sec. 3.1
-static void encrypt(Pt *c1, Pt *c2, const Pt *pm, const Pt *pub)   // Sec. 3.2
-static void decrypt(Pt *pm, const Pt *c1, const Pt *c2, const mpz_t d)  // Sec. 3.3
+static void keygen(mpz_t d, Pt *pub)                                              // Sec. 3.1
+static void make_K(mpz_t k, mpz_t x, mpz_t s, int hardened)                        // Sec. 3.2 Steps 2-3
+static void encrypt_K(Pt *c1, Pt *c2, const Pt *pm, const Pt *pub, const mpz_t k)  // Sec. 3.2 Step 4
+static int  encrypt(Pt *c1, Pt *c2, const Pt *pm, const Pt *pub, int hardened)     // Sec. 3.2
+static int  decrypt(Pt *pm, const Pt *c1, const Pt *c2, const mpz_t d, int hardened)  // Sec. 3.3
 ```
 * **`keygen`**: random `d`, then `Pub = d * B` with `pt_mul`.
-* **`encrypt`**: `S = pentatope(Bx)`, `K = euler_K(S)`, `C1 = K*B`, `t = K*Pub`, `C2 = Pm + t`. Two scalar multiplications.
-* **`decrypt`**: `t = d*C1`, negate it, `Pm = C2 + (-t)`. One scalar multiplication.
+* **`make_K`**: chooses the pentatope input `x` (`Bx` in paper-exact mode, a fresh random number in hardened mode, see 3.12),
+  then `S = pentatope(x)`, `K = euler_K(S)`.
+* **`encrypt_K`**: `C1 = K*B`, `t = K*Pub`, `C2 = Pm + t`. Two scalar multiplications.
+* **`encrypt`**: `make_K` + `encrypt_K`. In hardened mode it first rejects an invalid public key (returns 0).
+* **`decrypt`**: `t = d*C1`, negate it, `Pm = C2 + (-t)`. One scalar multiplication. In hardened mode it first rejects invalid
+  `C1` / `C2` (returns 0).
 
 Each is a few lines and mirrors the paper's steps so you can compare them line by line with the PDF.
 
@@ -184,11 +192,43 @@ It exists so that **you can see** each intermediate value instead of just trusti
 | `S(1)=1, S(2)=5, S(3)=15` | the pentatope function matches hand calculation |
 | `K(1)=43, K(5)=71, K(15)=281` | the Euler formula matches hand calculation |
 | 1000 random messages round-trip | encrypt then decrypt returns the original (random lengths 0 to 29 bytes) |
+| `test_K_is_public` (100 messages) + `C1` constant | paper-exact: a keyless eavesdropper reads every message |
+| hardened: 1000 round trips, eavesdropper 0/1000, `C1` always new | hardened mode is correct and the attack fails |
+| hardened: bad points rejected, valid ones accepted | `pt_valid` works without false alarms |
 
 The `CHECK` macro prints PASS/FAIL and counts failures; `main` returns a non-zero exit code if anything failed.
 
 ### 3.11 `main`
-Calls `setup_curve()`. With `--test` it runs the tests; otherwise it runs the demo on the text you pass (default `"hello PEECC"`).
+Calls `setup_curve()`. With `--test` it runs the tests; otherwise it runs the demo on the text you pass (default `"hello PEECC"`),
+in hardened mode if `--hardened` is given. Every run prints its mode on the first line.
+
+### 3.12 Hardened mode (`--hardened`, a deviation from [18])
+The problem (section 5, limit 1): the paper feeds the pentatope with `Bx`, which everyone knows, so everyone knows `K`.
+The fix keeps the pentatope and Euler steps and changes **only their input**:
+
+| | paper-exact | hardened |
+|---|---|---|
+| pentatope input `x` | `Bx` (public) | fresh random number in `[1, N-1]` per message (secret) |
+| `K` | `S^2 + S + 41` (2029 bits) | `(S^2 + S + 41) mod N` (256 bits, same points, ~8x faster) |
+| `C1, C2`, decryption | unchanged | unchanged |
+| point checks | none (the paper has none) | `pt_valid` on `Pub` (encrypt) and `C1`, `C2` (decrypt) |
+
+* **`pt_valid(q)`**: the point is not infinity, both coordinates are in `[0, p-1]`, and it lies on the curve. Because secp256r1 has
+  cofactor 1, every point on the curve is in the group generated by B, so no further subgroup check is needed.
+* **`eve_attack`**: the keyless eavesdropper. It computes the paper's public `K` and tries `C2 - K*Pub`. Against paper-exact
+  ciphertexts it reads the message; against hardened ones it gets garbage, because the real `K` came from a secret `x`.
+* **Why it is secure now:** without `x` nobody can compute `K`, and `C1 = K*B` reveals `K` only through the discrete-log problem.
+  The scheme is now EC-ElGamal whose one-time number is produced by the pentatope formula.
+* **Honest note:** the security comes from the random `x`; the pentatope formula itself adds no strength. It is a degree-8
+  polynomial, so (mod the prime `N`) each `K` comes from at most 8 values of `x`: at most 3 bits of randomness are lost.
+  On tiny toy groups it is much worse (the GUI's 28-point curve gives only 4 different `K mod 28`), which is why real sizes matter.
+* **Compressed points (library / protocol):** for a given `x` there are only two possible `y` values, `y` and
+  `p - y`, and exactly one of them is odd. So a point can travel as one byte (`02` = y even, `03` = y odd) plus `x`:
+  33 bytes instead of 64. The receiver recomputes `y = (x^3 + ax + b)^((p+1)/4)` (the same square-root trick as
+  Koblitz encoding) and picks the root with the right parity. A ciphertext block shrinks from 1024 to 528 bits.
+  Bad input (wrong prefix, `x >= p`, or an `x` with no square root) is rejected. The library's mode flags are
+  `PEECC_HARDENED = 1` and `PEECC_COMPRESSED = 2`; the protocol's hardened mode uses both.
+* **Still missing in both modes:** an integrity tag (ciphertexts can be modified), constant-time code.
 
 ---
 
@@ -216,20 +256,21 @@ Calls `setup_curve()`. With `--test` it runs the tests; otherwise it runs the de
 
 1. **The K weakness.** `K` comes only from the *public* generator `B`. Anyone can compute `K` and then `Pm = C2 - K*Pub`
    **without any private key**. Also `C1 = K*B` is identical for every message (run the demo twice: `C1` never changes).
-   So paper-exact PEECC does **not** keep messages secret. We implemented it faithfully on purpose; a secure variant would use a fresh
-   random number per message. We can add that later as a clearly labelled option.
+   So paper-exact PEECC does **not** keep messages secret. We implemented it faithfully on purpose (it is the default), and
+   `test_K_is_public` proves the break. The opt-in `--hardened` mode (3.12) fixes it with a random pentatope input per message.
 2. **Educational code.** The arithmetic is not constant-time, so it is not safe against timing side-channel attacks. It is for learning and
    verification, not for production.
 3. **29-byte messages.** Larger messages need splitting.
-4. **Unused leftover:** in `encrypt`, the variable `kp` is created and freed but never used (harmless, can be removed).
+4. **No integrity:** neither mode has an authentication tag, so a modified ciphertext is not detected beyond the marker-byte check.
 
 ---
 
 ## 6. How you can verify everything yourself
 
 ```
-make test                     # 13 checks, all should say PASS
-make run                      # shows every value of one encrypt/decrypt
+make test                     # 21 checks, all should say PASS
+make run                      # shows every value of one encrypt/decrypt (paper-exact)
+make run-hardened             # the same in hardened mode: the eavesdropper now FAILS
 ./peecc.exe "any text"        # try your own message (max 29 bytes); run twice and watch C1 stay the same
 ```
 Things to try:

@@ -1,0 +1,1140 @@
+####################################################################################################
+$ python simulate.py --all        (2026-10-27 11:56)
+####################################################################################################
+mode: paper-exact [18] (x = B_x, K public)
+log:  C:\Users\Prasun\Desktop\Auth-Protocol-for-Secure-UWCN\logs\run_20261027_115634.log
+
+====================================================================================================
+DEMO  (mode: paper-exact [18] (x = B_x, K public))
+====================================================================================================
+Topology of IoT Fig. 1: 31 entities, primary path S1 -> SB1 -> B1 -> SAT1 -> BS
+Initialization (IoT IV-A): every entity has PK, PU = PK*B and ID = H(PU || E || serial); e.g. S1 ID = bff441148606b1b2
+Registration (IoT IV-B): 114 registrations on primary and fallback links, all VALID
+
+Mutual authentication (IoT IV-C): S1, S2, S3 -> SB1 (M1-M3), then SB1 -> B1 -> SAT1 -> BS (M4-M12)
+
+[M1] S1 -> SB1   t = 0.269 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_UWS         bff441148606b1b2
+      plaintext Nonce_UWS      d1252b36e0b6cc6c
+      plaintext TS             0
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 4b95e23f91e54396ce..  (block 1, x || y)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.25 s < dT = 2.00 s
+      result ACCEPTED
+
+[M2] SB1 -> S1   t = 0.539 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_SUB         285df4916fa6844b
+      plaintext Nonce (echo)   d1252b36e0b6cc6c
+      plaintext TS             5
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 41747d8254d4634573..  (block 1, x || y)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.25 s < dT = 2.00 s
+      result ACCEPTED
+      >>> session S_S1<->SB1 established at t = 0.539 s
+
+[M3] S1 -> SB1   t = 0.809 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_SUB         285df4916fa6844b
+      plaintext ENV            {'Temp': 5.09, 'Press': 339.1, 'CurrVel': 1.53, 'Sal': 32.04}
+      plaintext TS             10
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 39a71565bc221f32b3..  (block 1, x || y)
+      check  [ok] ID is own ID
+      check  [ok] session with S1 exists
+      check  [ok] |now - TS| = 0.30 s < dT = 1.50 s
+      result ACCEPTED
+
+[M1] S2 -> SB1   t = 1.456 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_UWS         8daea3c00b799b2e
+      plaintext Nonce_UWS      24900705e8f241c8
+      plaintext TS             16
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 2741f637c7d6ed6831..  (block 1, x || y)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.65 s < dT = 1.50 s
+      result ACCEPTED
+
+[M2] SB1 -> S2   t = 2.103 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_SUB         285df4916fa6844b
+      plaintext Nonce (echo)   24900705e8f241c8
+      plaintext TS             29
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 2a0140e457c3b9a626..  (block 1, x || y)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.65 s < dT = 2.00 s
+      result ACCEPTED
+      >>> session S_S2<->SB1 established at t = 2.103 s
+
+[M3] S2 -> SB1   t = 2.749 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_SUB         285df4916fa6844b
+      plaintext ENV            {'Temp': 13.4, 'Press': 180.3, 'CurrVel': 1.3, 'Sal': 36.31}
+      plaintext TS             42
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 6f6944c4078ec15955..  (block 1, x || y)
+      check  [ok] ID is own ID
+      check  [ok] session with S2 exists
+      check  [ok] |now - TS| = 0.60 s < dT = 1.90 s
+      result ACCEPTED
+
+[M1] S3 -> SB1   t = 3.244 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_UWS         20c300bd0a6c7377
+      plaintext Nonce_UWS      f334f179c82c5476
+      plaintext TS             54
+      ciphertext C1 = 681dc23639d030c4df..  C2 = b70b1df2b9e25e01ca..  (block 1, x || y)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.50 s < dT = 1.90 s
+      result ACCEPTED
+
+[M2] SB1 -> S3   t = 3.737 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_SUB         285df4916fa6844b
+      plaintext Nonce (echo)   f334f179c82c5476
+      plaintext TS             64
+      ciphertext C1 = 681dc23639d030c4df..  C2 = d4a5f769486ab6b982..  (block 1, x || y)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.50 s < dT = 2.00 s
+      result ACCEPTED
+      >>> session S_S3<->SB1 established at t = 3.737 s
+
+[M3] S3 -> SB1   t = 4.226 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_SUB         285df4916fa6844b
+      plaintext ENV            {'Temp': 4.16, 'Press': 12.3, 'CurrVel': 1.67, 'Sal': 33.46}
+      plaintext TS             74
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 02c60c4f83d95785ac..  (block 1, x || y)
+      check  [ok] ID is own ID
+      check  [ok] session with S3 exists
+      check  [ok] |now - TS| = 0.50 s < dT = 1.93 s
+      result ACCEPTED
+
+[M4] SB1 -> B1   t = 4.920 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_SUB         285df4916fa6844b
+      plaintext Nonce_SUB      38c76b367cf0a8e6
+      plaintext TS             84
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 6242b0ff003bdaf51a..  (block 1, x || y)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.70 s < dT = 2.00 s
+      result ACCEPTED
+
+[M5] B1 -> SB1   t = 5.610 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_B           6547ad18e93a9412
+      plaintext Nonce (echo)   38c76b367cf0a8e6
+      plaintext TS             98
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 9b78279c7e017eb4f5..  (block 1, x || y)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.70 s < dT = 1.93 s
+      result ACCEPTED
+      >>> session S_SB1<->B1 established at t = 5.610 s
+
+[M6] SB1 -> B1   t = 6.426 s   2 block(s) x 1024 bit = 2048 bit on the wire
+      plaintext ID_B           6547ad18e93a9412
+      plaintext ENV            {'Temp': 7.55, 'Press': 177.233, 'CurrVel': 1.5, 'Sal': 33.937}
+      plaintext Alerts         jamming:none spoof:none
+      plaintext TS             112
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 845e231dbfaeedf986..  (block 1, x || y)
+      check  [ok] ID is own ID
+      check  [ok] session with SB1 exists
+      check  [ok] |now - TS| = 0.80 s < dT = 2.40 s
+      result ACCEPTED
+
+[M7] B1 -> SAT1   t = 7.113 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_B           6547ad18e93a9412
+      plaintext Nonce_B        bc1ce51882350a20
+      plaintext TS             128
+      ciphertext C1 = 681dc23639d030c4df..  C2 = d4c2370ad902f3bd0f..  (block 1, x || y)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.70 s < dT = 2.00 s
+      result ACCEPTED
+
+[M8] SAT1 -> B1   t = 7.799 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_SAT         12bfa287a311ac5d
+      plaintext Nonce (echo)   bc1ce51882350a20
+      plaintext TS             142
+      ciphertext C1 = 681dc23639d030c4df..  C2 = ad4ba93756d5deb963..  (block 1, x || y)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.70 s < dT = 2.40 s
+      result ACCEPTED
+      >>> session S_B1<->SAT1 established at t = 7.799 s
+
+[M9] B1 -> SAT1   t = 8.607 s   2 block(s) x 1024 bit = 2048 bit on the wire
+      plaintext ID_SAT         12bfa287a311ac5d
+      plaintext ENV            {'Temp': 7.55, 'Press': 177.233, 'CurrVel': 1.5, 'Sal': 33.937}
+      plaintext Alerts         jamming:none spoof:none
+      plaintext GPS            (12.9716, 77.5946)
+      plaintext TS             155
+      ciphertext C1 = 681dc23639d030c4df..  C2 = baab88169b0749fd7e..  (block 1, x || y)
+      check  [ok] ID is own ID
+      check  [ok] session with B1 exists
+      check  [ok] |now - TS| = 0.85 s < dT = 2.40 s
+      result ACCEPTED
+
+[M10] SAT1 -> BS   t = 8.977 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_SAT         12bfa287a311ac5d
+      plaintext Nonce_SAT      e9e7cb1258f86812
+      plaintext TS             172
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 389356cbb5df975d12..  (block 1, x || y)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.35 s < dT = 2.00 s
+      result ACCEPTED
+
+[M11] BS -> SAT1   t = 9.350 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_BS          9d2eab867ce7ff26
+      plaintext Nonce (echo)   e9e7cb1258f86812
+      plaintext TS             179
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 18defd51e4f3f47d8a..  (block 1, x || y)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.35 s < dT = 2.40 s
+      result ACCEPTED
+      >>> session S_SAT1<->BS established at t = 9.350 s
+
+[M12] SAT1 -> BS   t = 9.960 s   3 block(s) x 1024 bit = 3072 bit on the wire
+      plaintext ID_BS          9d2eab867ce7ff26
+      plaintext ENV            {'Temp': 7.55, 'Press': 177.233, 'CurrVel': 1.5, 'Sal': 33.937}
+      plaintext Alerts         jamming:none spoof:none
+      plaintext GPS            (12.9716, 77.5946)
+      plaintext LOGS           fw=1.2 batt=87%
+      plaintext TS             187
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 9d80a1ac2c4a7f1955..  (block 1, x || y)
+      check  [ok] ID is own ID
+      check  [ok] session with SAT1 exists
+      check  [ok] |now - TS| = 0.60 s < dT = 1.70 s
+      result ACCEPTED
+
+All hops authenticated: True;  sessions created: 12;  simulated time 9.960 s
+
+====================================================================================================
+ATTACKS  (each run in both modes; paper-exact = [18], hardened = deviation)
+====================================================================================================
+attack                                   paper-exact            hardened              
+replay of M1 (within dT)                 detected               detected              
+delay injection (M1 held 4 s)            detected               detected              
+delay injection (held 12.8 s, TS wraps)  NOT DETECTED           NOT DETECTED          
+impersonate SUB to UWS (wrong key)       NOT DETECTED           detected              
+impersonate UWS to SUB (inject M1+M3)    NOT DETECTED           NOT DETECTED          
+tampered registration (PU swapped)       detected               detected              
+duplicate RID                            detected               detected              
+rogue registration (own key, valid v)    detected               detected              
+revoked node S7 authenticates            detected               detected              
+forged revocation list (revoke SB1)      detected               detected              
+K-public eavesdropping (M1-M12)          NOT DETECTED           detected              
+
+paper-exact [18] (x = B_x, K public):
+  replay of M1 (within dT)                 nonce already used (replay)
+  delay injection (M1 held 4 s)            stale timestamp (4.25 s >= 2.00 s)
+  delay injection (held 12.8 s, TS wraps)  accepted: 8-bit TS wrapped and the nonce was never used (paper gap)
+  impersonate SUB to UWS (wrong key)       own key: cannot decrypt; K-public: read the nonce; S1: ok
+  impersonate UWS to SUB (inject M1+M3)    M1 accepted, fake M3 accepted: no proof of PK_UWS in M1 (protocol gap)
+  tampered registration (PU swapped)       status INVALID
+  duplicate RID                            first VALID, second DUPLICATE
+  rogue registration (own key, valid v)    status UNKNOWN (directory check, IoT IV-E-3)
+  revoked node S7 authenticates            ID on revocation list
+  forged revocation list (revoke SB1)      tag check failed
+  K-public eavesdropping (M1-M12)          keyless attacker read 12 of 12 messages
+
+HARDENED (deviation from [18]: random pentatope input x, K mod N, point validation, compressed points):
+  replay of M1 (within dT)                 nonce already used (replay)
+  delay injection (M1 held 4 s)            stale timestamp (4.20 s >= 2.00 s)
+  delay injection (held 12.8 s, TS wraps)  accepted: 8-bit TS wrapped and the nonce was never used (paper gap)
+  impersonate SUB to UWS (wrong key)       own key: cannot decrypt; K-public: failed; S1: nonce mismatch
+  impersonate UWS to SUB (inject M1+M3)    M1 accepted, fake M3 accepted: no proof of PK_UWS in M1 (protocol gap)
+  tampered registration (PU swapped)       status INVALID
+  duplicate RID                            first VALID, second DUPLICATE
+  rogue registration (own key, valid v)    status UNKNOWN (directory check, IoT IV-E-3)
+  revoked node S7 authenticates            ID on revocation list
+  forged revocation list (revoke SB1)      tag check failed
+  K-public eavesdropping (M1-M12)          keyless attacker read 0 of 12 messages
+
+====================================================================================================
+FALLBACK  (IoT Sec. IV-D, mode: paper-exact [18] (x = B_x, K public))
+====================================================================================================
+Scenario 1: buoy B1 is unresponsive; SB1 must re-authenticate via its fallback buoy
+
+[M4] SB1 -> B1   no response, waited dT = 2.00 s
+
+>>> FALLBACK: SB1 switches from B1 to preregistered peer B2
+
+[M4] SB1 -> B2   t = 3.210 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_SUB         af60576ab6c59193
+      plaintext Nonce_SUB      25a850eedca8721e
+      plaintext TS             53
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 50701b410e5ca3f54e..  (block 1, x || y)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.55 s < dT = 2.00 s
+      result ACCEPTED
+
+[M5] B2 -> SB1   t = 3.731 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_B           e7963e2b9286fb1c
+      plaintext Nonce (echo)   25a850eedca8721e
+      plaintext TS             64
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 04f0a762d74e8a1df4..  (block 1, x || y)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.55 s < dT = 2.00 s
+      result ACCEPTED
+      >>> session S_SB1<->B2 established at t = 3.731 s
+
+[M6] SB1 -> B2   t = 4.374 s   2 block(s) x 1024 bit = 2048 bit on the wire
+      plaintext ID_B           e7963e2b9286fb1c
+      plaintext ENV            {'Temp': 5.09, 'Press': 339.1, 'CurrVel': 1.53, 'Sal': 32.04}
+      plaintext Alerts         none
+      plaintext TS             74
+      ciphertext C1 = 681dc23639d030c4df..  C2 = d41860759077028800..  (block 1, x || y)
+      check  [ok] ID is own ID
+      check  [ok] session with SB1 exists
+      check  [ok] |now - TS| = 0.65 s < dT = 2.10 s
+      result ACCEPTED
+
+=> SB1 authenticated with B2: True, fallback time 4.374 s
+
+Scenario 2: satellite SAT1 answers 4 s late; B1 rejects the stale response and routes to its fallback SAT
+
+[M7] B1 -> SAT1   t = 0.688 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_B           16c6b904e491670a
+      plaintext Nonce_B        9198edad366cbcd3
+      plaintext TS             0
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 3539c481685dae49b5..  (block 1, x || y)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.65 s < dT = 2.00 s
+      result ACCEPTED
+
+[M8] SAT1 -> B1   t = 5.374 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_SAT         9d84eff495c715b2
+      plaintext Nonce (echo)   9198edad366cbcd3
+      plaintext TS             93
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 45a82f8359a530134f..  (block 1, x || y)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [FAIL] |TS_resp - TS_req| = 4.65 s < dT = 2.00 s
+      result REJECTED: response too late (4.65 s >= 2.00 s)
+
+>>> FALLBACK: B1 switches from SAT1 to preregistered peer SAT2
+
+[M7] B1 -> SAT2   t = 5.964 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_B           16c6b904e491670a
+      plaintext Nonce_B        5b0263b844157c90
+      plaintext TS             107
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 54e4a587da45d45a9b..  (block 1, x || y)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.60 s < dT = 2.00 s
+      result ACCEPTED
+
+[M8] SAT2 -> B1   t = 6.555 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_SAT         2481632bdc1bf44b
+      plaintext Nonce (echo)   5b0263b844157c90
+      plaintext TS             119
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 997662f4c6d7ea8d8f..  (block 1, x || y)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.60 s < dT = 2.00 s
+      result ACCEPTED
+      >>> session S_B1<->SAT2 established at t = 6.555 s
+
+[M9] B1 -> SAT2   t = 7.281 s   2 block(s) x 1024 bit = 2048 bit on the wire
+      plaintext ID_SAT         2481632bdc1bf44b
+      plaintext ENV            {'Temp': 13.4, 'Press': 180.3, 'CurrVel': 1.3, 'Sal': 36.31}
+      plaintext Alerts         none
+      plaintext GPS            (12.97, 77.59)
+      plaintext TS             131
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 610910ef4a4da9f821..  (block 1, x || y)
+      check  [ok] ID is own ID
+      check  [ok] session with B1 exists
+      check  [ok] |now - TS| = 0.70 s < dT = 2.20 s
+      result ACCEPTED
+
+=> B1 authenticated with SAT2: True, fallback time 7.281 s
+
+Scenario 3: mobile node S1 moves into the range of SB2 and re-authenticates with M1-M3
+
+[M1] S1 -> SB2   t = 0.701 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_UWS         3bd2a95d76f5d90e
+      plaintext Nonce_UWS      e2a895d22c5e1426
+      plaintext TS             0
+      ciphertext C1 = 681dc23639d030c4df..  C2 = f7fefe42868d086c09..  (block 1, x || y)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.65 s < dT = 2.00 s
+      result ACCEPTED
+
+[M2] SB2 -> S1   t = 1.397 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_SUB         afed7308e39db98d
+      plaintext Nonce (echo)   e2a895d22c5e1426
+      plaintext TS             14
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 7ebf1b15e15f993b69..  (block 1, x || y)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.70 s < dT = 2.00 s
+      result ACCEPTED
+      >>> session S_S1<->SB2 established at t = 1.397 s
+
+[M3] S1 -> SB2   t = 2.093 s   1 block(s) x 1024 bit = 1024 bit on the wire
+      plaintext ID_SUB         afed7308e39db98d
+      plaintext ENV            {'Temp': 4.16, 'Press': 12.3, 'CurrVel': 1.67, 'Sal': 33.46}
+      plaintext TS             27
+      ciphertext C1 = 681dc23639d030c4df..  C2 = 7548048d5690e797ff..  (block 1, x || y)
+      check  [ok] ID is own ID
+      check  [ok] session with S1 exists
+      check  [ok] |now - TS| = 0.70 s < dT = 2.30 s
+      result ACCEPTED
+
+=> re-authentication succeeded: total 2.093 s (computation 60.347 ms, rest is acoustic transmission)
+
+====================================================================================================
+SCALE  (IoT Sec. VI-A: 10-200 nodes, 2-5 levels, mode: paper-exact [18] (x = B_x, K public))
+====================================================================================================
+series              nodes  depth   messages   on-wire bits   mean leaf->BS s  all done s
+nodes                  10      5         27          31744             10.27       10.27
+nodes                  25      5         72          82944             13.97       13.97
+nodes                  50      5        147         169984             16.87       18.19
+nodes                 100      5        297         343040             17.02       19.81
+nodes                 200      5        597         690176             19.96       26.92
+depth, 100 nodes      100      2        297         304128             72.23      148.36
+depth, 100 nodes      100      3        297         332800             24.26       45.92
+depth, 100 nodes      100      4        297         339968             16.31       23.67
+depth, 100 nodes      100      5        297         343040             17.06       19.85
+depth, fan-out 3        4      2          9           9216              2.88        4.88
+depth, fan-out 3       13      3         36          39936              7.28        9.78
+depth, fan-out 3       40      4        117         132096             11.99       14.41
+depth, fan-out 3      121      5        360         408576             18.15       21.16
+
+====================================================================================================
+SCYTHER  (local binary, --max-runs=5)
+====================================================================================================
+58 claims: 23 Ok, 35 Fail  (21.2 s, full output in results/scyther_output.txt)
+  uwcreg,I         Secret_I1          sk(I)    Ok    [proof of correctness]
+  uwcreg,J         Alive_J1           -        Fail  [at least 1 attack]
+  hop1,UWS         Secret_UWS1        Nuws     Ok    [no attack within bounds]
+  hop1,UWS         Secret_UWS2        Env      Ok    [no attack within bounds]
+  hop1,UWS         Alive_UWS3         -        Ok    [no attack within bounds]
+  hop1,UWS         Weakagree_UWS4     -        Ok    [no attack within bounds]
+  hop1,UWS         Niagree_UWS5       -        Fail  [at least 4 attacks]
+  hop1,UWS         Nisynch_UWS6       -        Fail  [at least 4 attacks]
+  hop1,SUB         Secret_SUB1        Env      Fail  [at least 10 attacks]
+  hop1,SUB         Alive_SUB2         -        Fail  [at least 6 attacks]
+  hop1,SUB         Weakagree_SUB3     -        Fail  [at least 6 attacks]
+  hop1,SUB         Niagree_SUB4       -        Fail  [at least 9 attacks]
+  hop1,SUB         Nisynch_SUB5       -        Fail  [at least 9 attacks]
+  hop2,SUB         Secret_SUB1        Nsub     Ok    [no attack within bounds]
+  hop2,SUB         Secret_SUB2        Env      Ok    [no attack within bounds]
+  hop2,SUB         Secret_SUB3        Alerts   Ok    [no attack within bounds]
+  hop2,SUB         Alive_SUB4         -        Ok    [no attack within bounds]
+  hop2,SUB         Weakagree_SUB5     -        Ok    [no attack within bounds]
+  hop2,SUB         Niagree_SUB6       -        Fail  [at least 4 attacks]
+  hop2,SUB         Nisynch_SUB7       -        Fail  [at least 4 attacks]
+  hop2,B           Secret_B1          Env      Fail  [at least 10 attacks]
+  hop2,B           Secret_B2          Alerts   Fail  [at least 10 attacks]
+  hop2,B           Alive_B3           -        Fail  [at least 6 attacks]
+  hop2,B           Weakagree_B4       -        Fail  [at least 6 attacks]
+  hop2,B           Niagree_B5         -        Fail  [at least 9 attacks]
+  hop2,B           Nisynch_B6         -        Fail  [at least 9 attacks]
+  hop3,B           Secret_B1          Nb       Ok    [no attack within bounds]
+  hop3,B           Secret_B2          Env      Ok    [no attack within bounds]
+  hop3,B           Secret_B3          Alerts   Ok    [no attack within bounds]
+  hop3,B           Secret_B4          Gps      Ok    [no attack within bounds]
+  hop3,B           Alive_B5           -        Ok    [no attack within bounds]
+  hop3,B           Weakagree_B6       -        Ok    [no attack within bounds]
+  hop3,B           Niagree_B7         -        Fail  [at least 4 attacks]
+  hop3,B           Nisynch_B8         -        Fail  [at least 4 attacks]
+  hop3,SAT         Secret_SAT1        Env      Fail  [at least 10 attacks]
+  hop3,SAT         Secret_SAT2        Alerts   Fail  [at least 10 attacks]
+  hop3,SAT         Secret_SAT3        Gps      Fail  [at least 10 attacks]
+  hop3,SAT         Alive_SAT4         -        Fail  [at least 6 attacks]
+  hop3,SAT         Weakagree_SAT5     -        Fail  [at least 6 attacks]
+  hop3,SAT         Niagree_SAT6       -        Fail  [at least 9 attacks]
+  hop3,SAT         Nisynch_SAT7       -        Fail  [at least 9 attacks]
+  hop4,SAT         Secret_SAT1        Nsat     Ok    [no attack within bounds]
+  hop4,SAT         Secret_SAT2        Env      Ok    [no attack within bounds]
+  hop4,SAT         Secret_SAT3        Alerts   Ok    [no attack within bounds]
+  hop4,SAT         Secret_SAT4        Gps      Ok    [no attack within bounds]
+  hop4,SAT         Secret_SAT5        Logs     Ok    [no attack within bounds]
+  hop4,SAT         Alive_SAT6         -        Ok    [no attack within bounds]
+  hop4,SAT         Weakagree_SAT7     -        Ok    [no attack within bounds]
+  hop4,SAT         Niagree_SAT8       -        Fail  [at least 3 attacks]
+  hop4,SAT         Nisynch_SAT9       -        Fail  [at least 3 attacks]
+  hop4,BS          Secret_BS1         Env      Fail  [at least 10 attacks]
+  hop4,BS          Secret_BS2         Alerts   Fail  [at least 10 attacks]
+  hop4,BS          Secret_BS3         Gps      Fail  [at least 10 attacks]
+  hop4,BS          Secret_BS4         Logs     Fail  [at least 10 attacks]
+  hop4,BS          Alive_BS5          -        Fail  [at least 6 attacks]
+  hop4,BS          Weakagree_BS6      -        Fail  [at least 6 attacks]
+  hop4,BS          Niagree_BS7        -        Fail  [at least 7 attacks]
+  hop4,BS          Nisynch_BS8        -        Fail  [at least 7 attacks]
+
+====================================================================================================
+METRICS  (mode: paper-exact [18] (x = B_x, K public))
+====================================================================================================
+Measured C timings (peecc_bench, one block): keygen 2.023 ms, encrypt 36.743 ms, decrypt 2.197 ms
+
+Communication cost for one authentication UWS -> BS (12 messages):
+  msg    hop          model bits    wire bits
+  M1     UWS->SUB            136         1024
+  M2     SUB->UWS            136         1024
+  M3     UWS->SUB            200         1024
+  M4     SUB->B              136         1024
+  M5     B->SUB              136         1024
+  M6     SUB->B              392         2048
+  M7     B->SAT              136         1024
+  M8     SAT->B              136         1024
+  M9     B->SAT              456         2048
+  M10    SAT->BS             136         1024
+  M11    BS->SAT             136         1024
+  M12    SAT->BS             584         3072
+  (a) paper model (plaintext fields, 64/64/8-bit ID/nonce/TS): 2720 bit, handshakes alone 1088 bit; paper claims 2112 bit (derived candidate 4 x (136 + 136 + 256), flagged: the paper gives only the total)
+      transmission at 10 kbps: 272 ms (paper: 211 ms)
+  (b) actual on-wire size with PEECC blocks (1024 bit each, 512-bit points): 16384 bit, 1638 ms at 10 kbps
+  registration message {RID, PU, v}: 832 bit each (not part of the 2112-bit figure)
+
+Per entity (one full cycle: initialization + registration with its neighbours + authentication):
+  ent    ECC mul  ECC bits  hash   enc   dec  measured ms   paper ms  energy uJ    flat uJ  R bytes
+  UWS          6      8628     4     2     1       86.001      0.400      842.5      177.6       20
+  SUB         12     17256     7     3     3      174.288      0.500     1679.0      349.2       40
+  B           13     17512     7     3     3      171.729      0.500     1703.0      373.2       40
+  SAT         15     21570     7     3     3      221.020      0.500     2083.4      421.2       40
+  BS           7      5338     4     1     2       50.036      0.400      534.0      201.6       20
+  energy model (paper's per-operation values): ECC 24 uJ per 256 scalar bits (K has 2029 bits here), hash 6 uJ, enc/dec 3.2 uJ; 'flat' = 24 uJ per ECC operation as in the paper; paper's UWS total 24 + 12 + 12.8 = 48.8 uJ
+
+Propagation delay per hop (distance / 1500 m/s) and transmission time:
+  SUB-UWS    propagation 0.147 s, transmission 0.307 s
+  B-SUB      propagation 0.575 s, transmission 0.410 s
+  B-SAT      propagation 0.525 s, transmission 0.410 s
+  BS-SAT     propagation 0.220 s, transmission 0.512 s
+End-to-end authentication latency UWS -> BS: 6.732 s;  sessions created: 8
+
+====================================================================================================
+PAPER CLAIM vs MEASURED
+====================================================================================================
+claim                                        paper      measured                                           result
+Total communication cost (paper model)       2112 bit   2720 bit (handshakes only: 1088)                   FAIL  
+                                               reason: derived candidate 4 x (136+136+256); our M1/M2-type messages are 136 bit each as assumed, but the paper does not give data-message sizes, so our M3/M6/M9/M12 encodings differ
+30-34% reduction vs 3008-3216 bit            30-34 %    29.8-34.3 % (paper's own numbers); ours vs baselin PASS  
+Transmission time of 2112 bit at 10 kbps     211 ms     272 ms model, 1638 ms on the wire                  FAIL  
+                                               reason: the paper counts plaintext fields; every PEECC block on the wire is 1024 bit (C1, C2, 512-bit points as in the paper), 16384 bit in total
+Computation per entity: UWS                  0.400 ms   86.001 ms (measured, incl. keygen)                 FAIL  
+                                               reason: measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms; paper-exact K has 2029 bits
+Computation per entity: SUB                  0.500 ms   174.288 ms (measured, incl. keygen)                FAIL  
+                                               reason: measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms; paper-exact K has 2029 bits
+Computation per entity: B                    0.500 ms   171.729 ms (measured, incl. keygen)                FAIL  
+                                               reason: measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms; paper-exact K has 2029 bits
+Computation per entity: SAT                  0.500 ms   221.020 ms (measured, incl. keygen)                FAIL  
+                                               reason: measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms; paper-exact K has 2029 bits
+Computation per entity: BS                   0.400 ms   50.036 ms (measured, incl. keygen)                 FAIL  
+                                               reason: measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms; paper-exact K has 2029 bits
+UWS energy per authentication                48.8 uJ    842.5 uJ (6 ECC mult, 4 hash, 2 enc, 1 dec; flat m FAIL  
+                                               reason: paper's per-operation energies, ECC charged per 256 scalar bits (K has 2029 bits in this mode); PEECC needs 2 ECC multiplications per encrypted block and 1 per decryption, the paper counts 1 ECC and charges encryption at the AES rate
+Mobile re-authentication (M1-M3)             < 1 ms     60.347 ms computation, 2.093 s incl. acoustic link FAIL  
+                                               reason: computation measured; the paper's figure ignores propagation and transmission
+Registry storage of a UWS (< 10 peers)       < 250 B    40 B (20 B per RID)                                PASS  
+Attacks detected (paper-exact)               all        7 of 11                                            FAIL  
+                                               reason: delay injection (held 12.8 s, TS wraps); impersonate SUB to UWS (wrong key); impersonate UWS to SUB (inject M1+M3); K-public eavesdropping (M1-M12)
+Attacks detected (hardened)                  all        9 of 11                                            FAIL  
+                                               reason: delay injection (held 12.8 s, TS wraps); impersonate UWS to SUB (inject M1+M3)
+Scyther: all claims verified (Fig. 6)        all Ok     23 Ok, 35 Fail                                     FAIL  
+                                               reason: responder-side claims fail: M1/M4/M7/M10 contain nothing only the initiator can produce
+Delay grows linearly with depth              linear     fan-out 3: 5.05 s/level, R^2 = 0.993               PASS  
+5-D curve overhead 1.3x of 2-D               1.3x       not measured                                       N.A.  
+                                               reason: implementation is 2-D ([18]); no 5-D arithmetic exists
+
+Written: results/metrics.json, results/metrics.csv, results/communication_cost.png, results/latency.png
+
+====================================================================================================
+FIGURES
+====================================================================================================
+Figures (modes: paper-exact, hardened): results/communication_cost.png, results/latency.png, results/claims_scorecard.png, results/improvement_security.png, results/improvement_cost.png, results/performance_entities.png, results/performance_latency.png, results/scyther_claims.png
+
+####################################################################################################
+$ python simulate.py --all --hardened        (2026-10-27 11:58)
+####################################################################################################
+mode: HARDENED (deviation from [18]: random pentatope input x, K mod N, point validation, compressed points)
+log:  C:\Users\Prasun\Desktop\Auth-Protocol-for-Secure-UWCN\logs\run_20261027_115821.log
+
+====================================================================================================
+DEMO  (mode: HARDENED (deviation from [18]: random pentatope input x, K mod N, point validation, compressed points))
+====================================================================================================
+Topology of IoT Fig. 1: 31 entities, primary path S1 -> SB1 -> B1 -> SAT1 -> BS
+Initialization (IoT IV-A): every entity has PK, PU = PK*B and ID = H(PU || E || serial); e.g. S1 ID = 026c338306048441
+Registration (IoT IV-B): 114 registrations on primary and fallback links, all VALID
+
+Mutual authentication (IoT IV-C): S1, S2, S3 -> SB1 (M1-M3), then SB1 -> B1 -> SAT1 -> BS (M4-M12)
+
+[M1] S1 -> SB1   t = 0.204 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_UWS         026c338306048441
+      plaintext Nonce_UWS      697c7827c71bc9f5
+      plaintext TS             0
+      ciphertext C1 = 02c1c1d9aa77c43d61..  C2 = 0368eb7f9d19d91af3..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.20 s < dT = 2.00 s
+      result ACCEPTED
+
+[M2] SB1 -> S1   t = 0.407 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_SUB         e8221a78a73830c7
+      plaintext Nonce (echo)   697c7827c71bc9f5
+      plaintext TS             4
+      ciphertext C1 = 02c8a51c421b1667ae..  C2 = 022f663c366723d5b4..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.20 s < dT = 2.00 s
+      result ACCEPTED
+      >>> session S_S1<->SB1 established at t = 0.407 s
+
+[M3] S1 -> SB1   t = 0.610 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_SUB         e8221a78a73830c7
+      plaintext ENV            {'Temp': 5.09, 'Press': 339.1, 'CurrVel': 1.53, 'Sal': 32.04}
+      plaintext TS             8
+      ciphertext C1 = 0291d78cc30b5486e7..  C2 = 03c832fc655cb7fbfa..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID is own ID
+      check  [ok] session with S1 exists
+      check  [ok] |now - TS| = 0.20 s < dT = 1.40 s
+      result ACCEPTED
+
+[M1] S2 -> SB1   t = 1.191 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_UWS         115025dfc0d4aed5
+      plaintext Nonce_UWS      1a2733c1b57fd667
+      plaintext TS             12
+      ciphertext C1 = 02e75e7623552759c9..  C2 = 03cc4ae782d261918d..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.55 s < dT = 1.40 s
+      result ACCEPTED
+
+[M2] SB1 -> S2   t = 1.773 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_SUB         e8221a78a73830c7
+      plaintext Nonce (echo)   1a2733c1b57fd667
+      plaintext TS             23
+      ciphertext C1 = 02360baa415ec9cead..  C2 = 0259b9a0e3d4f0c938..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.55 s < dT = 2.00 s
+      result ACCEPTED
+      >>> session S_S2<->SB1 established at t = 1.773 s
+
+[M3] S2 -> SB1   t = 2.354 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_SUB         e8221a78a73830c7
+      plaintext ENV            {'Temp': 13.4, 'Press': 180.3, 'CurrVel': 1.3, 'Sal': 36.31}
+      plaintext TS             35
+      ciphertext C1 = 03fde1a82f359e71c6..  C2 = 03b7cee04e76fd30e8..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID is own ID
+      check  [ok] session with S2 exists
+      check  [ok] |now - TS| = 0.60 s < dT = 1.75 s
+      result ACCEPTED
+
+[M1] S3 -> SB1   t = 2.775 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_UWS         f45457bc79431d19
+      plaintext Nonce_UWS      261d60c325aa5345
+      plaintext TS             47
+      ciphertext C1 = 03ff3b01680431c9e3..  C2 = 0375d6ba3479719f6a..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.40 s < dT = 1.75 s
+      result ACCEPTED
+
+[M2] SB1 -> S3   t = 3.196 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_SUB         e8221a78a73830c7
+      plaintext Nonce (echo)   261d60c325aa5345
+      plaintext TS             55
+      ciphertext C1 = 036011c97ae45bc6af..  C2 = 03d3edae834c53f1dc..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.40 s < dT = 2.00 s
+      result ACCEPTED
+      >>> session S_S3<->SB1 established at t = 3.196 s
+
+[M3] S3 -> SB1   t = 3.616 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_SUB         e8221a78a73830c7
+      plaintext ENV            {'Temp': 4.16, 'Press': 12.3, 'CurrVel': 1.67, 'Sal': 33.46}
+      plaintext TS             63
+      ciphertext C1 = 02bb516757de80d64b..  C2 = 0269df435ec376bfb5..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID is own ID
+      check  [ok] session with S3 exists
+      check  [ok] |now - TS| = 0.45 s < dT = 1.77 s
+      result ACCEPTED
+
+[M4] SB1 -> B1   t = 4.241 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_SUB         e8221a78a73830c7
+      plaintext Nonce_SUB      5e6d3736d8c5a661
+      plaintext TS             72
+      ciphertext C1 = 03a6ca86d3b58328b1..  C2 = 03d02ce0d34eabb2fc..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.60 s < dT = 2.00 s
+      result ACCEPTED
+
+[M5] B1 -> SB1   t = 4.866 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_B           101da0fbbaf95296
+      plaintext Nonce (echo)   5e6d3736d8c5a661
+      plaintext TS             84
+      ciphertext C1 = 03d4fbca07af246651..  C2 = 02a2301b6c91217373..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.60 s < dT = 1.77 s
+      result ACCEPTED
+      >>> session S_SB1<->B1 established at t = 4.866 s
+
+[M6] SB1 -> B1   t = 5.548 s   2 block(s) x 528 bit = 1056 bit on the wire
+      plaintext ID_B           101da0fbbaf95296
+      plaintext ENV            {'Temp': 7.55, 'Press': 177.233, 'CurrVel': 1.5, 'Sal': 33.937}
+      plaintext Alerts         jamming:none spoof:none
+      plaintext TS             97
+      ciphertext C1 = 024c3aaf68fbda6f2f..  C2 = 03f032541c70d275d2..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID is own ID
+      check  [ok] session with SB1 exists
+      check  [ok] |now - TS| = 0.65 s < dT = 2.20 s
+      result ACCEPTED
+
+[M7] B1 -> SAT1   t = 6.169 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_B           101da0fbbaf95296
+      plaintext Nonce_B        98bfc9372d3bf291
+      plaintext TS             110
+      ciphertext C1 = 039e32efa833e9173a..  C2 = 024d4fec692f88ad4e..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.65 s < dT = 2.00 s
+      result ACCEPTED
+
+[M8] SAT1 -> B1   t = 6.789 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_SAT         44739f624763ce22
+      plaintext Nonce (echo)   98bfc9372d3bf291
+      plaintext TS             123
+      ciphertext C1 = 02ef243131789be1c7..  C2 = 03085288db2344e390..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.65 s < dT = 2.20 s
+      result ACCEPTED
+      >>> session S_B1<->SAT1 established at t = 6.789 s
+
+[M9] B1 -> SAT1   t = 7.466 s   2 block(s) x 528 bit = 1056 bit on the wire
+      plaintext ID_SAT         44739f624763ce22
+      plaintext ENV            {'Temp': 7.55, 'Press': 177.233, 'CurrVel': 1.5, 'Sal': 33.937}
+      plaintext Alerts         jamming:none spoof:none
+      plaintext GPS            (12.9716, 77.5946)
+      plaintext TS             135
+      ciphertext C1 = 029696bb97ef8239f3..  C2 = 020fed1b12f91415c5..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID is own ID
+      check  [ok] session with B1 exists
+      check  [ok] |now - TS| = 0.70 s < dT = 2.30 s
+      result ACCEPTED
+
+[M10] SAT1 -> BS   t = 7.771 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_SAT         44739f624763ce22
+      plaintext Nonce_SAT      2636f02f8dd89917
+      plaintext TS             149
+      ciphertext C1 = 02f4ace7c9c71282f0..  C2 = 0310cb795d810c0574..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.30 s < dT = 2.00 s
+      result ACCEPTED
+
+[M11] BS -> SAT1   t = 8.076 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_BS          e697a098fd04ea04
+      plaintext Nonce (echo)   2636f02f8dd89917
+      plaintext TS             155
+      ciphertext C1 = 02c122125587c50a07..  C2 = 036ad81fef48f258c6..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.30 s < dT = 2.30 s
+      result ACCEPTED
+      >>> session S_SAT1<->BS established at t = 8.076 s
+
+[M12] SAT1 -> BS   t = 8.495 s   3 block(s) x 528 bit = 1584 bit on the wire
+      plaintext ID_BS          e697a098fd04ea04
+      plaintext ENV            {'Temp': 7.55, 'Press': 177.233, 'CurrVel': 1.5, 'Sal': 33.937}
+      plaintext Alerts         jamming:none spoof:none
+      plaintext GPS            (12.9716, 77.5946)
+      plaintext LOGS           fw=1.2 batt=87%
+      plaintext TS             161
+      ciphertext C1 = 02eda66001d7b354f2..  C2 = 021152f7b113bd0211..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID is own ID
+      check  [ok] session with SAT1 exists
+      check  [ok] |now - TS| = 0.40 s < dT = 1.60 s
+      result ACCEPTED
+
+All hops authenticated: True;  sessions created: 12;  simulated time 8.495 s
+
+====================================================================================================
+ATTACKS  (each run in both modes; paper-exact = [18], hardened = deviation)
+====================================================================================================
+attack                                   paper-exact            hardened              
+replay of M1 (within dT)                 detected               detected              
+delay injection (M1 held 4 s)            detected               detected              
+delay injection (held 12.8 s, TS wraps)  NOT DETECTED           NOT DETECTED          
+impersonate SUB to UWS (wrong key)       NOT DETECTED           detected              
+impersonate UWS to SUB (inject M1+M3)    NOT DETECTED           NOT DETECTED          
+tampered registration (PU swapped)       detected               detected              
+duplicate RID                            detected               detected              
+rogue registration (own key, valid v)    detected               detected              
+revoked node S7 authenticates            detected               detected              
+forged revocation list (revoke SB1)      detected               detected              
+K-public eavesdropping (M1-M12)          NOT DETECTED           detected              
+
+paper-exact [18] (x = B_x, K public):
+  replay of M1 (within dT)                 nonce already used (replay)
+  delay injection (M1 held 4 s)            stale timestamp (4.25 s >= 2.00 s)
+  delay injection (held 12.8 s, TS wraps)  accepted: 8-bit TS wrapped and the nonce was never used (paper gap)
+  impersonate SUB to UWS (wrong key)       own key: cannot decrypt; K-public: read the nonce; S1: ok
+  impersonate UWS to SUB (inject M1+M3)    M1 accepted, fake M3 accepted: no proof of PK_UWS in M1 (protocol gap)
+  tampered registration (PU swapped)       status INVALID
+  duplicate RID                            first VALID, second DUPLICATE
+  rogue registration (own key, valid v)    status UNKNOWN (directory check, IoT IV-E-3)
+  revoked node S7 authenticates            ID on revocation list
+  forged revocation list (revoke SB1)      tag check failed
+  K-public eavesdropping (M1-M12)          keyless attacker read 12 of 12 messages
+
+HARDENED (deviation from [18]: random pentatope input x, K mod N, point validation, compressed points):
+  replay of M1 (within dT)                 nonce already used (replay)
+  delay injection (M1 held 4 s)            stale timestamp (4.20 s >= 2.00 s)
+  delay injection (held 12.8 s, TS wraps)  accepted: 8-bit TS wrapped and the nonce was never used (paper gap)
+  impersonate SUB to UWS (wrong key)       own key: cannot decrypt; K-public: failed; S1: nonce mismatch
+  impersonate UWS to SUB (inject M1+M3)    M1 accepted, fake M3 accepted: no proof of PK_UWS in M1 (protocol gap)
+  tampered registration (PU swapped)       status INVALID
+  duplicate RID                            first VALID, second DUPLICATE
+  rogue registration (own key, valid v)    status UNKNOWN (directory check, IoT IV-E-3)
+  revoked node S7 authenticates            ID on revocation list
+  forged revocation list (revoke SB1)      tag check failed
+  K-public eavesdropping (M1-M12)          keyless attacker read 0 of 12 messages
+
+====================================================================================================
+FALLBACK  (IoT Sec. IV-D, mode: HARDENED (deviation from [18]: random pentatope input x, K mod N, point validation, compressed points))
+====================================================================================================
+Scenario 1: buoy B1 is unresponsive; SB1 must re-authenticate via its fallback buoy
+
+[M4] SB1 -> B1   no response, waited dT = 2.00 s
+
+>>> FALLBACK: SB1 switches from B1 to preregistered peer B2
+
+[M4] SB1 -> B2   t = 3.081 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_SUB         ddc05c94ce5c79da
+      plaintext Nonce_SUB      2c9cfdea81a80d64
+      plaintext TS             52
+      ciphertext C1 = 02af571e871f8e712b..  C2 = 03eee5a0ebfa20ac33..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.45 s < dT = 2.00 s
+      result ACCEPTED
+
+[M5] B2 -> SB1   t = 3.538 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_B           98dcf0998ab3d830
+      plaintext Nonce (echo)   2c9cfdea81a80d64
+      plaintext TS             61
+      ciphertext C1 = 02b7108a05fbb47a44..  C2 = 03f53209c6304e3fb2..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.45 s < dT = 2.00 s
+      result ACCEPTED
+      >>> session S_SB1<->B2 established at t = 3.538 s
+
+[M6] SB1 -> B2   t = 4.050 s   2 block(s) x 528 bit = 1056 bit on the wire
+      plaintext ID_B           98dcf0998ab3d830
+      plaintext ENV            {'Temp': 5.09, 'Press': 339.1, 'CurrVel': 1.53, 'Sal': 32.04}
+      plaintext Alerts         none
+      plaintext TS             70
+      ciphertext C1 = 0235b6264728c2a14e..  C2 = 0288fcb9dd16b4e9e1..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID is own ID
+      check  [ok] session with SB1 exists
+      check  [ok] |now - TS| = 0.55 s < dT = 1.90 s
+      result ACCEPTED
+
+=> SB1 authenticated with B2: True, fallback time 4.050 s
+
+Scenario 2: satellite SAT1 answers 4 s late; B1 rejects the stale response and routes to its fallback SAT
+
+[M7] B1 -> SAT1   t = 0.621 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_B           7330c9e8b9d0f9cd
+      plaintext Nonce_B        e413e76ed32a7379
+      plaintext TS             0
+      ciphertext C1 = 03c07901a2ff826e30..  C2 = 0285248aa103059be8..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.60 s < dT = 2.00 s
+      result ACCEPTED
+
+[M8] SAT1 -> B1   t = 5.242 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_SAT         ba8d89098d8d4432
+      plaintext Nonce (echo)   e413e76ed32a7379
+      plaintext TS             92
+      ciphertext C1 = 036abdd131efbc2678..  C2 = 0314fcb04326a81ffa..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [FAIL] |TS_resp - TS_req| = 4.60 s < dT = 2.00 s
+      result REJECTED: response too late (4.60 s >= 2.00 s)
+
+>>> FALLBACK: B1 switches from SAT1 to preregistered peer SAT2
+
+[M7] B1 -> SAT2   t = 5.767 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_B           7330c9e8b9d0f9cd
+      plaintext Nonce_B        d2561a1bdd312c89
+      plaintext TS             104
+      ciphertext C1 = 024dc3208ef0f95f1e..  C2 = 039ca7bd2a35157f45..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.55 s < dT = 2.00 s
+      result ACCEPTED
+
+[M8] SAT2 -> B1   t = 6.291 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_SAT         bb4b1780168da82a
+      plaintext Nonce (echo)   d2561a1bdd312c89
+      plaintext TS             115
+      ciphertext C1 = 02c132d2e265444fcb..  C2 = 03621dff75b9b275e4..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.55 s < dT = 2.00 s
+      result ACCEPTED
+      >>> session S_B1<->SAT2 established at t = 6.291 s
+
+[M9] B1 -> SAT2   t = 6.873 s   2 block(s) x 528 bit = 1056 bit on the wire
+      plaintext ID_SAT         bb4b1780168da82a
+      plaintext ENV            {'Temp': 13.4, 'Press': 180.3, 'CurrVel': 1.3, 'Sal': 36.31}
+      plaintext Alerts         none
+      plaintext GPS            (12.97, 77.59)
+      plaintext TS             125
+      ciphertext C1 = 02336db4362466162e..  C2 = 03facfc9779470734e..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID is own ID
+      check  [ok] session with B1 exists
+      check  [ok] |now - TS| = 0.60 s < dT = 2.10 s
+      result ACCEPTED
+
+=> B1 authenticated with SAT2: True, fallback time 6.873 s
+
+Scenario 3: mobile node S1 moves into the range of SB2 and re-authenticates with M1-M3
+
+[M1] S1 -> SB2   t = 0.631 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_UWS         fa12a2abb71d7ba2
+      plaintext Nonce_UWS      986405eb98abf9f4
+      plaintext TS             0
+      ciphertext C1 = 038eb40b4c8267f230..  C2 = 035a598ee49dd88fe4..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID registered
+      check  [ok] ID not revoked
+      check  [ok] nonce unused
+      check  [ok] |now - TS| = 0.60 s < dT = 2.00 s
+      result ACCEPTED
+
+[M2] SB2 -> S1   t = 1.262 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_SUB         0483cceb3bbf2e28
+      plaintext Nonce (echo)   986405eb98abf9f4
+      plaintext TS             12
+      ciphertext C1 = 036839a0cf344db061..  C2 = 03b438ee96698a9d57..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID_R is the expected peer
+      check  [ok] ID not revoked
+      check  [ok] Nonce_recv = Nonce_sent
+      check  [ok] |TS_resp - TS_req| = 0.60 s < dT = 2.00 s
+      result ACCEPTED
+      >>> session S_S1<->SB2 established at t = 1.262 s
+
+[M3] S1 -> SB2   t = 1.894 s   1 block(s) x 528 bit = 528 bit on the wire
+      plaintext ID_SUB         0483cceb3bbf2e28
+      plaintext ENV            {'Temp': 4.16, 'Press': 12.3, 'CurrVel': 1.67, 'Sal': 33.46}
+      plaintext TS             25
+      ciphertext C1 = 03a9401a989cf87ef7..  C2 = 0265cdb3f6c079044a..  (block 1, compressed: 02/03 || x)
+      check  [ok] ID is own ID
+      check  [ok] session with S1 exists
+      check  [ok] |now - TS| = 0.60 s < dT = 2.20 s
+      result ACCEPTED
+
+=> re-authentication succeeded: total 1.894 s (computation 10.005 ms, rest is acoustic transmission)
+
+====================================================================================================
+SCALE  (IoT Sec. VI-A: 10-200 nodes, 2-5 levels, mode: HARDENED (deviation from [18]: random pentatope input x, K mod N, point validation, compressed points))
+====================================================================================================
+series              nodes  depth   messages   on-wire bits   mean leaf->BS s  all done s
+nodes                  10      5         27          16368              8.66        8.66
+nodes                  25      5         72          42768             11.86       11.86
+nodes                  50      5        147          87648             14.60       15.77
+nodes                 100      5        297         176880             14.26       16.62
+nodes                 200      5        597         355872             16.64       22.54
+depth, 100 nodes      100      2        297         156816             61.96      128.15
+depth, 100 nodes      100      3        297         171600             20.44       38.08
+depth, 100 nodes      100      4        297         175296             13.78       19.80
+depth, 100 nodes      100      5        297         176880             14.25       16.61
+depth, fan-out 3        4      2          9           4752              2.47        4.27
+depth, fan-out 3       13      3         36          20592              6.34        8.67
+depth, fan-out 3       40      4        117          68112              9.96       12.07
+depth, fan-out 3      121      5        360         210672             15.33       18.15
+
+====================================================================================================
+SCYTHER  (local binary, --max-runs=5)
+====================================================================================================
+58 claims: 23 Ok, 35 Fail  (14.5 s, full output in results/scyther_output.txt)
+  uwcreg,I         Secret_I1          sk(I)    Ok    [proof of correctness]
+  uwcreg,J         Alive_J1           -        Fail  [at least 1 attack]
+  hop1,UWS         Secret_UWS1        Nuws     Ok    [no attack within bounds]
+  hop1,UWS         Secret_UWS2        Env      Ok    [no attack within bounds]
+  hop1,UWS         Alive_UWS3         -        Ok    [no attack within bounds]
+  hop1,UWS         Weakagree_UWS4     -        Ok    [no attack within bounds]
+  hop1,UWS         Niagree_UWS5       -        Fail  [at least 4 attacks]
+  hop1,UWS         Nisynch_UWS6       -        Fail  [at least 4 attacks]
+  hop1,SUB         Secret_SUB1        Env      Fail  [at least 10 attacks]
+  hop1,SUB         Alive_SUB2         -        Fail  [at least 6 attacks]
+  hop1,SUB         Weakagree_SUB3     -        Fail  [at least 6 attacks]
+  hop1,SUB         Niagree_SUB4       -        Fail  [at least 9 attacks]
+  hop1,SUB         Nisynch_SUB5       -        Fail  [at least 9 attacks]
+  hop2,SUB         Secret_SUB1        Nsub     Ok    [no attack within bounds]
+  hop2,SUB         Secret_SUB2        Env      Ok    [no attack within bounds]
+  hop2,SUB         Secret_SUB3        Alerts   Ok    [no attack within bounds]
+  hop2,SUB         Alive_SUB4         -        Ok    [no attack within bounds]
+  hop2,SUB         Weakagree_SUB5     -        Ok    [no attack within bounds]
+  hop2,SUB         Niagree_SUB6       -        Fail  [at least 4 attacks]
+  hop2,SUB         Nisynch_SUB7       -        Fail  [at least 4 attacks]
+  hop2,B           Secret_B1          Env      Fail  [at least 10 attacks]
+  hop2,B           Secret_B2          Alerts   Fail  [at least 10 attacks]
+  hop2,B           Alive_B3           -        Fail  [at least 6 attacks]
+  hop2,B           Weakagree_B4       -        Fail  [at least 6 attacks]
+  hop2,B           Niagree_B5         -        Fail  [at least 9 attacks]
+  hop2,B           Nisynch_B6         -        Fail  [at least 9 attacks]
+  hop3,B           Secret_B1          Nb       Ok    [no attack within bounds]
+  hop3,B           Secret_B2          Env      Ok    [no attack within bounds]
+  hop3,B           Secret_B3          Alerts   Ok    [no attack within bounds]
+  hop3,B           Secret_B4          Gps      Ok    [no attack within bounds]
+  hop3,B           Alive_B5           -        Ok    [no attack within bounds]
+  hop3,B           Weakagree_B6       -        Ok    [no attack within bounds]
+  hop3,B           Niagree_B7         -        Fail  [at least 4 attacks]
+  hop3,B           Nisynch_B8         -        Fail  [at least 4 attacks]
+  hop3,SAT         Secret_SAT1        Env      Fail  [at least 10 attacks]
+  hop3,SAT         Secret_SAT2        Alerts   Fail  [at least 10 attacks]
+  hop3,SAT         Secret_SAT3        Gps      Fail  [at least 10 attacks]
+  hop3,SAT         Alive_SAT4         -        Fail  [at least 6 attacks]
+  hop3,SAT         Weakagree_SAT5     -        Fail  [at least 6 attacks]
+  hop3,SAT         Niagree_SAT6       -        Fail  [at least 9 attacks]
+  hop3,SAT         Nisynch_SAT7       -        Fail  [at least 9 attacks]
+  hop4,SAT         Secret_SAT1        Nsat     Ok    [no attack within bounds]
+  hop4,SAT         Secret_SAT2        Env      Ok    [no attack within bounds]
+  hop4,SAT         Secret_SAT3        Alerts   Ok    [no attack within bounds]
+  hop4,SAT         Secret_SAT4        Gps      Ok    [no attack within bounds]
+  hop4,SAT         Secret_SAT5        Logs     Ok    [no attack within bounds]
+  hop4,SAT         Alive_SAT6         -        Ok    [no attack within bounds]
+  hop4,SAT         Weakagree_SAT7     -        Ok    [no attack within bounds]
+  hop4,SAT         Niagree_SAT8       -        Fail  [at least 3 attacks]
+  hop4,SAT         Nisynch_SAT9       -        Fail  [at least 3 attacks]
+  hop4,BS          Secret_BS1         Env      Fail  [at least 10 attacks]
+  hop4,BS          Secret_BS2         Alerts   Fail  [at least 10 attacks]
+  hop4,BS          Secret_BS3         Gps      Fail  [at least 10 attacks]
+  hop4,BS          Secret_BS4         Logs     Fail  [at least 10 attacks]
+  hop4,BS          Alive_BS5          -        Fail  [at least 6 attacks]
+  hop4,BS          Weakagree_BS6      -        Fail  [at least 6 attacks]
+  hop4,BS          Niagree_BS7        -        Fail  [at least 7 attacks]
+  hop4,BS          Nisynch_BS8        -        Fail  [at least 7 attacks]
+
+====================================================================================================
+METRICS  (mode: HARDENED (deviation from [18]: random pentatope input x, K mod N, point validation, compressed points))
+====================================================================================================
+Measured C timings (peecc_bench, one block): keygen 1.159 ms, encrypt 2.415 ms, decrypt 1.196 ms
+
+Communication cost for one authentication UWS -> BS (12 messages):
+  msg    hop          model bits    wire bits
+  M1     UWS->SUB            136          528
+  M2     SUB->UWS            136          528
+  M3     UWS->SUB            200          528
+  M4     SUB->B              136          528
+  M5     B->SUB              136          528
+  M6     SUB->B              392         1056
+  M7     B->SAT              136          528
+  M8     SAT->B              136          528
+  M9     B->SAT              456         1056
+  M10    SAT->BS             136          528
+  M11    BS->SAT             136          528
+  M12    SAT->BS             584         1584
+  (a) paper model (plaintext fields, 64/64/8-bit ID/nonce/TS): 2720 bit, handshakes alone 1088 bit; paper claims 2112 bit (derived candidate 4 x (136 + 136 + 256), flagged: the paper gives only the total)
+      transmission at 10 kbps: 272 ms (paper: 211 ms)
+  (b) actual on-wire size with PEECC blocks (528 bit each, compressed points): 8448 bit, 845 ms at 10 kbps
+  registration message {RID, PU, v}: 832 bit each (not part of the 2112-bit figure)
+
+Per entity (one full cycle: initialization + registration with its neighbours + authentication):
+  ent    ECC mul  ECC bits  hash   enc   dec  measured ms   paper ms  energy uJ    flat uJ  R bytes
+  UWS          6      1536     4     2     1        8.984      0.400      177.6      177.6       20
+  SUB         12      3072     7     3     3       15.088      0.500      349.2      349.2       40
+  B           13      3328     7     3     3       16.495      0.500      373.2      373.2       40
+  SAT         15      3840     7     3     3       20.549      0.500      421.2      421.2       40
+  BS           7      1792     4     1     2        9.891      0.400      201.6      201.6       20
+  energy model (paper's per-operation values): ECC 24 uJ per 256 scalar bits (K has 256 bits here), hash 6 uJ, enc/dec 3.2 uJ; 'flat' = 24 uJ per ECC operation as in the paper; paper's UWS total 24 + 12 + 12.8 = 48.8 uJ
+
+Propagation delay per hop (distance / 1500 m/s) and transmission time:
+  SUB-UWS    propagation 0.147 s, transmission 0.158 s
+  B-SUB      propagation 0.575 s, transmission 0.211 s
+  B-SAT      propagation 0.525 s, transmission 0.211 s
+  BS-SAT     propagation 0.220 s, transmission 0.264 s
+End-to-end authentication latency UWS -> BS: 5.309 s;  sessions created: 8
+
+====================================================================================================
+PAPER CLAIM vs MEASURED
+====================================================================================================
+claim                                        paper      measured                                           result
+Total communication cost (paper model)       2112 bit   2720 bit (handshakes only: 1088)                   FAIL  
+                                               reason: derived candidate 4 x (136+136+256); our M1/M2-type messages are 136 bit each as assumed, but the paper does not give data-message sizes, so our M3/M6/M9/M12 encodings differ
+30-34% reduction vs 3008-3216 bit            30-34 %    29.8-34.3 % (paper's own numbers); ours vs baselin PASS  
+Transmission time of 2112 bit at 10 kbps     211 ms     272 ms model, 845 ms on the wire                   FAIL  
+                                               reason: the paper counts plaintext fields; every PEECC block on the wire is 528 bit (C1, C2, compressed points), 8448 bit in total
+Computation per entity: UWS                  0.400 ms   8.984 ms (measured, incl. keygen)                  FAIL  
+                                               reason: measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms
+Computation per entity: SUB                  0.500 ms   15.088 ms (measured, incl. keygen)                 FAIL  
+                                               reason: measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms
+Computation per entity: B                    0.500 ms   16.495 ms (measured, incl. keygen)                 FAIL  
+                                               reason: measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms
+Computation per entity: SAT                  0.500 ms   20.549 ms (measured, incl. keygen)                 FAIL  
+                                               reason: measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms
+Computation per entity: BS                   0.400 ms   9.891 ms (measured, incl. keygen)                  FAIL  
+                                               reason: measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms
+UWS energy per authentication                48.8 uJ    177.6 uJ (6 ECC mult, 4 hash, 2 enc, 1 dec; flat m FAIL  
+                                               reason: paper's per-operation energies, ECC charged per 256 scalar bits (K has 256 bits in this mode); PEECC needs 2 ECC multiplications per encrypted block and 1 per decryption, the paper counts 1 ECC and charges encryption at the AES rate
+Mobile re-authentication (M1-M3)             < 1 ms     10.005 ms computation, 1.894 s incl. acoustic link FAIL  
+                                               reason: computation measured; the paper's figure ignores propagation and transmission
+Registry storage of a UWS (< 10 peers)       < 250 B    40 B (20 B per RID)                                PASS  
+Attacks detected (paper-exact)               all        7 of 11                                            FAIL  
+                                               reason: delay injection (held 12.8 s, TS wraps); impersonate SUB to UWS (wrong key); impersonate UWS to SUB (inject M1+M3); K-public eavesdropping (M1-M12)
+Attacks detected (hardened)                  all        9 of 11                                            FAIL  
+                                               reason: delay injection (held 12.8 s, TS wraps); impersonate UWS to SUB (inject M1+M3)
+Scyther: all claims verified (Fig. 6)        all Ok     23 Ok, 35 Fail                                     FAIL  
+                                               reason: responder-side claims fail: M1/M4/M7/M10 contain nothing only the initiator can produce
+Delay grows linearly with depth              linear     fan-out 3: 4.22 s/level, R^2 = 0.991               PASS  
+5-D curve overhead 1.3x of 2-D               1.3x       not measured                                       N.A.  
+                                               reason: implementation is 2-D ([18]); no 5-D arithmetic exists
+
+Written: results/metrics.json, results/metrics.csv, results/communication_cost.png, results/latency.png
+
+====================================================================================================
+FIGURES
+====================================================================================================
+Figures (modes: paper-exact, hardened): results/communication_cost.png, results/latency.png, results/claims_scorecard.png, results/improvement_security.png, results/improvement_cost.png, results/performance_entities.png, results/performance_latency.png, results/scyther_claims.png
+

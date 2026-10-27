@@ -1,0 +1,1098 @@
+{
+  "mode": "HARDENED (deviation from [18]: random pentatope input x, K mod N, point validation, compressed points)",
+  "hardened": true,
+  "seed": 1,
+  "library": "C:\\Users\\Prasun\\Desktop\\Auth-Protocol-for-Secure-UWCN\\peecc.dll",
+  "c_bench_ms": {
+    "keygen": 1.1586120021343231,
+    "encrypt_block": 2.4149500036239626,
+    "decrypt_block": 1.1955759954452514
+  },
+  "chain": {
+    "ok": true,
+    "latency_s": 5.3091995263436065,
+    "messages": 12,
+    "block_bits": 528,
+    "compressed": true,
+    "k_bits": 256,
+    "per_message": [
+      {
+        "label": "M1",
+        "src": "UWS",
+        "dst": "SUB",
+        "model_bits": 136,
+        "wire_bits": 528
+      },
+      {
+        "label": "M2",
+        "src": "SUB",
+        "dst": "UWS",
+        "model_bits": 136,
+        "wire_bits": 528
+      },
+      {
+        "label": "M3",
+        "src": "UWS",
+        "dst": "SUB",
+        "model_bits": 200,
+        "wire_bits": 528
+      },
+      {
+        "label": "M4",
+        "src": "SUB",
+        "dst": "B",
+        "model_bits": 136,
+        "wire_bits": 528
+      },
+      {
+        "label": "M5",
+        "src": "B",
+        "dst": "SUB",
+        "model_bits": 136,
+        "wire_bits": 528
+      },
+      {
+        "label": "M6",
+        "src": "SUB",
+        "dst": "B",
+        "model_bits": 392,
+        "wire_bits": 1056
+      },
+      {
+        "label": "M7",
+        "src": "B",
+        "dst": "SAT",
+        "model_bits": 136,
+        "wire_bits": 528
+      },
+      {
+        "label": "M8",
+        "src": "SAT",
+        "dst": "B",
+        "model_bits": 136,
+        "wire_bits": 528
+      },
+      {
+        "label": "M9",
+        "src": "B",
+        "dst": "SAT",
+        "model_bits": 456,
+        "wire_bits": 1056
+      },
+      {
+        "label": "M10",
+        "src": "SAT",
+        "dst": "BS",
+        "model_bits": 136,
+        "wire_bits": 528
+      },
+      {
+        "label": "M11",
+        "src": "BS",
+        "dst": "SAT",
+        "model_bits": 136,
+        "wire_bits": 528
+      },
+      {
+        "label": "M12",
+        "src": "SAT",
+        "dst": "BS",
+        "model_bits": 584,
+        "wire_bits": 1584
+      }
+    ],
+    "model_bits": 2720,
+    "auth_only_bits": 1088,
+    "wire_bits": 8448,
+    "registration_bits_each": 832,
+    "model_tx_ms": 272.0,
+    "wire_tx_ms": 844.8,
+    "per_hop": {
+      "SUB-UWS": {
+        "prop_s": 0.1472852131341074,
+        "tx_s": 0.15839999999999999
+      },
+      "B-SUB": {
+        "prop_s": 0.5751269088290063,
+        "tx_s": 0.2112
+      },
+      "B-SAT": {
+        "prop_s": 0.5249314380526351,
+        "tx_s": 0.2112
+      },
+      "BS-SAT": {
+        "prop_s": 0.2197080821103197,
+        "tx_s": 0.264
+      }
+    },
+    "entities": {
+      "UWS": {
+        "ecc_mul": 6,
+        "ecc_bits": 1536,
+        "hash": 4,
+        "enc": 2,
+        "dec": 1,
+        "compute_ms": 8.984,
+        "energy_uj": 177.6,
+        "energy_flat_uj": 177.6,
+        "storage_bytes": 20,
+        "sessions": 1
+      },
+      "SUB": {
+        "ecc_mul": 12,
+        "ecc_bits": 3072,
+        "hash": 7,
+        "enc": 3,
+        "dec": 3,
+        "compute_ms": 15.088,
+        "energy_uj": 349.2,
+        "energy_flat_uj": 349.2,
+        "storage_bytes": 40,
+        "sessions": 2
+      },
+      "B": {
+        "ecc_mul": 13,
+        "ecc_bits": 3328,
+        "hash": 7,
+        "enc": 3,
+        "dec": 3,
+        "compute_ms": 16.495,
+        "energy_uj": 373.2,
+        "energy_flat_uj": 373.2,
+        "storage_bytes": 40,
+        "sessions": 2
+      },
+      "SAT": {
+        "ecc_mul": 15,
+        "ecc_bits": 3840,
+        "hash": 7,
+        "enc": 3,
+        "dec": 3,
+        "compute_ms": 20.549,
+        "energy_uj": 421.2,
+        "energy_flat_uj": 421.2,
+        "storage_bytes": 40,
+        "sessions": 2
+      },
+      "BS": {
+        "ecc_mul": 7,
+        "ecc_bits": 1792,
+        "hash": 4,
+        "enc": 1,
+        "dec": 2,
+        "compute_ms": 9.891,
+        "energy_uj": 201.6,
+        "energy_flat_uj": 201.6,
+        "storage_bytes": 20,
+        "sessions": 1
+      }
+    },
+    "sessions": 8
+  },
+  "fig1_storage": {
+    "S1": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S2": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S3": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S4": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S5": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S6": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S7": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S8": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S9": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S10": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S11": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S12": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S13": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S14": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S15": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S16": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S17": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "S18": {
+      "storage_bytes": 40,
+      "peers": 2
+    },
+    "SB1": {
+      "storage_bytes": 160,
+      "peers": 8
+    },
+    "SB2": {
+      "storage_bytes": 160,
+      "peers": 8
+    },
+    "SB3": {
+      "storage_bytes": 160,
+      "peers": 8
+    },
+    "SB4": {
+      "storage_bytes": 160,
+      "peers": 8
+    },
+    "SB5": {
+      "storage_bytes": 160,
+      "peers": 8
+    },
+    "SB6": {
+      "storage_bytes": 160,
+      "peers": 8
+    },
+    "B1": {
+      "storage_bytes": 120,
+      "peers": 6
+    },
+    "B2": {
+      "storage_bytes": 120,
+      "peers": 6
+    },
+    "B3": {
+      "storage_bytes": 120,
+      "peers": 6
+    },
+    "SAT1": {
+      "storage_bytes": 60,
+      "peers": 3
+    },
+    "SAT2": {
+      "storage_bytes": 60,
+      "peers": 3
+    },
+    "SAT3": {
+      "storage_bytes": 60,
+      "peers": 3
+    },
+    "BS": {
+      "storage_bytes": 60,
+      "peers": 3
+    }
+  },
+  "attacks": {
+    "paper-exact": [
+      {
+        "name": "replay of M1 (within dT)",
+        "detected": true,
+        "detail": "nonce already used (replay)"
+      },
+      {
+        "name": "delay injection (M1 held 4 s)",
+        "detected": true,
+        "detail": "stale timestamp (4.25 s >= 2.00 s)"
+      },
+      {
+        "name": "delay injection (held 12.8 s, TS wraps)",
+        "detected": false,
+        "detail": "accepted: 8-bit TS wrapped and the nonce was never used (paper gap)"
+      },
+      {
+        "name": "impersonate SUB to UWS (wrong key)",
+        "detected": false,
+        "detail": "own key: cannot decrypt; K-public: read the nonce; S1: ok"
+      },
+      {
+        "name": "impersonate UWS to SUB (inject M1+M3)",
+        "detected": false,
+        "detail": "M1 accepted, fake M3 accepted: no proof of PK_UWS in M1 (protocol gap)"
+      },
+      {
+        "name": "tampered registration (PU swapped)",
+        "detected": true,
+        "detail": "status INVALID"
+      },
+      {
+        "name": "duplicate RID",
+        "detected": true,
+        "detail": "first VALID, second DUPLICATE"
+      },
+      {
+        "name": "rogue registration (own key, valid v)",
+        "detected": true,
+        "detail": "status UNKNOWN (directory check, IoT IV-E-3)"
+      },
+      {
+        "name": "revoked node S7 authenticates",
+        "detected": true,
+        "detail": "ID on revocation list"
+      },
+      {
+        "name": "forged revocation list (revoke SB1)",
+        "detected": true,
+        "detail": "tag check failed"
+      },
+      {
+        "name": "K-public eavesdropping (M1-M12)",
+        "detected": false,
+        "detail": "keyless attacker read 12 of 12 messages"
+      }
+    ],
+    "hardened": [
+      {
+        "name": "replay of M1 (within dT)",
+        "detected": true,
+        "detail": "nonce already used (replay)"
+      },
+      {
+        "name": "delay injection (M1 held 4 s)",
+        "detected": true,
+        "detail": "stale timestamp (4.20 s >= 2.00 s)"
+      },
+      {
+        "name": "delay injection (held 12.8 s, TS wraps)",
+        "detected": false,
+        "detail": "accepted: 8-bit TS wrapped and the nonce was never used (paper gap)"
+      },
+      {
+        "name": "impersonate SUB to UWS (wrong key)",
+        "detected": true,
+        "detail": "own key: cannot decrypt; K-public: failed; S1: nonce mismatch"
+      },
+      {
+        "name": "impersonate UWS to SUB (inject M1+M3)",
+        "detected": false,
+        "detail": "M1 accepted, fake M3 accepted: no proof of PK_UWS in M1 (protocol gap)"
+      },
+      {
+        "name": "tampered registration (PU swapped)",
+        "detected": true,
+        "detail": "status INVALID"
+      },
+      {
+        "name": "duplicate RID",
+        "detected": true,
+        "detail": "first VALID, second DUPLICATE"
+      },
+      {
+        "name": "rogue registration (own key, valid v)",
+        "detected": true,
+        "detail": "status UNKNOWN (directory check, IoT IV-E-3)"
+      },
+      {
+        "name": "revoked node S7 authenticates",
+        "detected": true,
+        "detail": "ID on revocation list"
+      },
+      {
+        "name": "forged revocation list (revoke SB1)",
+        "detected": true,
+        "detail": "tag check failed"
+      },
+      {
+        "name": "K-public eavesdropping (M1-M12)",
+        "detected": true,
+        "detail": "keyless attacker read 0 of 12 messages"
+      }
+    ]
+  },
+  "fallback": {
+    "buoy_down": {
+      "peer": "B2",
+      "ok": true,
+      "seconds": 4.050250332900581
+    },
+    "sat_delayed": {
+      "peer": "SAT2",
+      "ok": true,
+      "seconds": 6.872726784889256
+    },
+    "mobile_reauth": {
+      "peer": "SB2",
+      "ok": true,
+      "seconds": 1.8937856264172277,
+      "compute_ms": 10.004899930208921
+    }
+  },
+  "scale": [
+    {
+      "series": "nodes",
+      "nodes": 10,
+      "depth": 5,
+      "end_to_end": 8.660852290385286,
+      "mean_leaf": 8.660852290385286,
+      "messages": 27,
+      "bits": 16368
+    },
+    {
+      "series": "nodes",
+      "nodes": 25,
+      "depth": 5,
+      "end_to_end": 11.861330341894476,
+      "mean_leaf": 11.861330341894476,
+      "messages": 72,
+      "bits": 42768
+    },
+    {
+      "series": "nodes",
+      "nodes": 50,
+      "depth": 5,
+      "end_to_end": 15.76706870706788,
+      "mean_leaf": 14.596657271170093,
+      "messages": 147,
+      "bits": 87648
+    },
+    {
+      "series": "nodes",
+      "nodes": 100,
+      "depth": 5,
+      "end_to_end": 16.616079137200995,
+      "mean_leaf": 14.263139749305079,
+      "messages": 297,
+      "bits": 176880
+    },
+    {
+      "series": "nodes",
+      "nodes": 200,
+      "depth": 5,
+      "end_to_end": 22.541278147656733,
+      "mean_leaf": 16.63799896564685,
+      "messages": 597,
+      "bits": 355872
+    },
+    {
+      "series": "depth, 100 nodes",
+      "nodes": 100,
+      "depth": 2,
+      "end_to_end": 128.1487138135134,
+      "mean_leaf": 61.963584948332034,
+      "messages": 297,
+      "bits": 156816
+    },
+    {
+      "series": "depth, 100 nodes",
+      "nodes": 100,
+      "depth": 3,
+      "end_to_end": 38.08269183733434,
+      "mean_leaf": 20.436075479515058,
+      "messages": 297,
+      "bits": 171600
+    },
+    {
+      "series": "depth, 100 nodes",
+      "nodes": 100,
+      "depth": 4,
+      "end_to_end": 19.796368585702247,
+      "mean_leaf": 13.780384755010443,
+      "messages": 297,
+      "bits": 175296
+    },
+    {
+      "series": "depth, 100 nodes",
+      "nodes": 100,
+      "depth": 5,
+      "end_to_end": 16.612099736876825,
+      "mean_leaf": 14.253118414711857,
+      "messages": 297,
+      "bits": 176880
+    },
+    {
+      "series": "depth, fan-out 3",
+      "nodes": 4,
+      "depth": 2,
+      "end_to_end": 4.269645280086147,
+      "mean_leaf": 2.4683388951647958,
+      "messages": 9,
+      "bits": 4752
+    },
+    {
+      "series": "depth, fan-out 3",
+      "nodes": 13,
+      "depth": 3,
+      "end_to_end": 8.672723216764359,
+      "mean_leaf": 6.336409337795268,
+      "messages": 36,
+      "bits": 20592
+    },
+    {
+      "series": "depth, fan-out 3",
+      "nodes": 40,
+      "depth": 4,
+      "end_to_end": 12.072627080053547,
+      "mean_leaf": 9.956795050150852,
+      "messages": 117,
+      "bits": 68112
+    },
+    {
+      "series": "depth, fan-out 3",
+      "nodes": 121,
+      "depth": 5,
+      "end_to_end": 18.147607974485826,
+      "mean_leaf": 15.334758579384964,
+      "messages": 360,
+      "bits": 210672
+    }
+  ],
+  "scyther": {
+    "seconds": 14.4768967628479,
+    "claims": [
+      {
+        "protocol": "uwcreg,I",
+        "claim": "Secret_I1",
+        "param": "sk(I)",
+        "result": "Ok",
+        "note": "[proof of correctness]"
+      },
+      {
+        "protocol": "uwcreg,J",
+        "claim": "Alive_J1",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 1 attack]"
+      },
+      {
+        "protocol": "hop1,UWS",
+        "claim": "Secret_UWS1",
+        "param": "Nuws",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop1,UWS",
+        "claim": "Secret_UWS2",
+        "param": "Env",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop1,UWS",
+        "claim": "Alive_UWS3",
+        "param": "-",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop1,UWS",
+        "claim": "Weakagree_UWS4",
+        "param": "-",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop1,UWS",
+        "claim": "Niagree_UWS5",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 4 attacks]"
+      },
+      {
+        "protocol": "hop1,UWS",
+        "claim": "Nisynch_UWS6",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 4 attacks]"
+      },
+      {
+        "protocol": "hop1,SUB",
+        "claim": "Secret_SUB1",
+        "param": "Env",
+        "result": "Fail",
+        "note": "[at least 10 attacks]"
+      },
+      {
+        "protocol": "hop1,SUB",
+        "claim": "Alive_SUB2",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 6 attacks]"
+      },
+      {
+        "protocol": "hop1,SUB",
+        "claim": "Weakagree_SUB3",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 6 attacks]"
+      },
+      {
+        "protocol": "hop1,SUB",
+        "claim": "Niagree_SUB4",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 9 attacks]"
+      },
+      {
+        "protocol": "hop1,SUB",
+        "claim": "Nisynch_SUB5",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 9 attacks]"
+      },
+      {
+        "protocol": "hop2,SUB",
+        "claim": "Secret_SUB1",
+        "param": "Nsub",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop2,SUB",
+        "claim": "Secret_SUB2",
+        "param": "Env",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop2,SUB",
+        "claim": "Secret_SUB3",
+        "param": "Alerts",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop2,SUB",
+        "claim": "Alive_SUB4",
+        "param": "-",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop2,SUB",
+        "claim": "Weakagree_SUB5",
+        "param": "-",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop2,SUB",
+        "claim": "Niagree_SUB6",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 4 attacks]"
+      },
+      {
+        "protocol": "hop2,SUB",
+        "claim": "Nisynch_SUB7",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 4 attacks]"
+      },
+      {
+        "protocol": "hop2,B",
+        "claim": "Secret_B1",
+        "param": "Env",
+        "result": "Fail",
+        "note": "[at least 10 attacks]"
+      },
+      {
+        "protocol": "hop2,B",
+        "claim": "Secret_B2",
+        "param": "Alerts",
+        "result": "Fail",
+        "note": "[at least 10 attacks]"
+      },
+      {
+        "protocol": "hop2,B",
+        "claim": "Alive_B3",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 6 attacks]"
+      },
+      {
+        "protocol": "hop2,B",
+        "claim": "Weakagree_B4",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 6 attacks]"
+      },
+      {
+        "protocol": "hop2,B",
+        "claim": "Niagree_B5",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 9 attacks]"
+      },
+      {
+        "protocol": "hop2,B",
+        "claim": "Nisynch_B6",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 9 attacks]"
+      },
+      {
+        "protocol": "hop3,B",
+        "claim": "Secret_B1",
+        "param": "Nb",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop3,B",
+        "claim": "Secret_B2",
+        "param": "Env",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop3,B",
+        "claim": "Secret_B3",
+        "param": "Alerts",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop3,B",
+        "claim": "Secret_B4",
+        "param": "Gps",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop3,B",
+        "claim": "Alive_B5",
+        "param": "-",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop3,B",
+        "claim": "Weakagree_B6",
+        "param": "-",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop3,B",
+        "claim": "Niagree_B7",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 4 attacks]"
+      },
+      {
+        "protocol": "hop3,B",
+        "claim": "Nisynch_B8",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 4 attacks]"
+      },
+      {
+        "protocol": "hop3,SAT",
+        "claim": "Secret_SAT1",
+        "param": "Env",
+        "result": "Fail",
+        "note": "[at least 10 attacks]"
+      },
+      {
+        "protocol": "hop3,SAT",
+        "claim": "Secret_SAT2",
+        "param": "Alerts",
+        "result": "Fail",
+        "note": "[at least 10 attacks]"
+      },
+      {
+        "protocol": "hop3,SAT",
+        "claim": "Secret_SAT3",
+        "param": "Gps",
+        "result": "Fail",
+        "note": "[at least 10 attacks]"
+      },
+      {
+        "protocol": "hop3,SAT",
+        "claim": "Alive_SAT4",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 6 attacks]"
+      },
+      {
+        "protocol": "hop3,SAT",
+        "claim": "Weakagree_SAT5",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 6 attacks]"
+      },
+      {
+        "protocol": "hop3,SAT",
+        "claim": "Niagree_SAT6",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 9 attacks]"
+      },
+      {
+        "protocol": "hop3,SAT",
+        "claim": "Nisynch_SAT7",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 9 attacks]"
+      },
+      {
+        "protocol": "hop4,SAT",
+        "claim": "Secret_SAT1",
+        "param": "Nsat",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop4,SAT",
+        "claim": "Secret_SAT2",
+        "param": "Env",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop4,SAT",
+        "claim": "Secret_SAT3",
+        "param": "Alerts",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop4,SAT",
+        "claim": "Secret_SAT4",
+        "param": "Gps",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop4,SAT",
+        "claim": "Secret_SAT5",
+        "param": "Logs",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop4,SAT",
+        "claim": "Alive_SAT6",
+        "param": "-",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop4,SAT",
+        "claim": "Weakagree_SAT7",
+        "param": "-",
+        "result": "Ok",
+        "note": "[no attack within bounds]"
+      },
+      {
+        "protocol": "hop4,SAT",
+        "claim": "Niagree_SAT8",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 3 attacks]"
+      },
+      {
+        "protocol": "hop4,SAT",
+        "claim": "Nisynch_SAT9",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 3 attacks]"
+      },
+      {
+        "protocol": "hop4,BS",
+        "claim": "Secret_BS1",
+        "param": "Env",
+        "result": "Fail",
+        "note": "[at least 10 attacks]"
+      },
+      {
+        "protocol": "hop4,BS",
+        "claim": "Secret_BS2",
+        "param": "Alerts",
+        "result": "Fail",
+        "note": "[at least 10 attacks]"
+      },
+      {
+        "protocol": "hop4,BS",
+        "claim": "Secret_BS3",
+        "param": "Gps",
+        "result": "Fail",
+        "note": "[at least 10 attacks]"
+      },
+      {
+        "protocol": "hop4,BS",
+        "claim": "Secret_BS4",
+        "param": "Logs",
+        "result": "Fail",
+        "note": "[at least 10 attacks]"
+      },
+      {
+        "protocol": "hop4,BS",
+        "claim": "Alive_BS5",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 6 attacks]"
+      },
+      {
+        "protocol": "hop4,BS",
+        "claim": "Weakagree_BS6",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 6 attacks]"
+      },
+      {
+        "protocol": "hop4,BS",
+        "claim": "Niagree_BS7",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 7 attacks]"
+      },
+      {
+        "protocol": "hop4,BS",
+        "claim": "Nisynch_BS8",
+        "param": "-",
+        "result": "Fail",
+        "note": "[at least 7 attacks]"
+      }
+    ],
+    "ok": 23,
+    "fail": 35
+  },
+  "claims": [
+    {
+      "claim": "Total communication cost (paper model)",
+      "paper": "2112 bit",
+      "measured": "2720 bit (handshakes only: 1088)",
+      "status": "FAIL",
+      "reason": "derived candidate 4 x (136+136+256); our M1/M2-type messages are 136 bit each as assumed, but the paper does not give data-message sizes, so our M3/M6/M9/M12 encodings differ"
+    },
+    {
+      "claim": "30-34% reduction vs 3008-3216 bit",
+      "paper": "30-34 %",
+      "measured": "29.8-34.3 % (paper's own numbers); ours vs baselines 9.6-15.4 %",
+      "status": "PASS",
+      "reason": "arithmetic from the paper's figures; 29.8 % rounds to 30 %"
+    },
+    {
+      "claim": "Transmission time of 2112 bit at 10 kbps",
+      "paper": "211 ms",
+      "measured": "272 ms model, 845 ms on the wire",
+      "status": "FAIL",
+      "reason": "the paper counts plaintext fields; every PEECC block on the wire is 528 bit (C1, C2, compressed points), 8448 bit in total"
+    },
+    {
+      "claim": "Computation per entity: UWS",
+      "paper": "0.400 ms",
+      "measured": "8.984 ms (measured, incl. keygen)",
+      "status": "FAIL",
+      "reason": "measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms"
+    },
+    {
+      "claim": "Computation per entity: SUB",
+      "paper": "0.500 ms",
+      "measured": "15.088 ms (measured, incl. keygen)",
+      "status": "FAIL",
+      "reason": "measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms"
+    },
+    {
+      "claim": "Computation per entity: B",
+      "paper": "0.500 ms",
+      "measured": "16.495 ms (measured, incl. keygen)",
+      "status": "FAIL",
+      "reason": "measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms"
+    },
+    {
+      "claim": "Computation per entity: SAT",
+      "paper": "0.500 ms",
+      "measured": "20.549 ms (measured, incl. keygen)",
+      "status": "FAIL",
+      "reason": "measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms"
+    },
+    {
+      "claim": "Computation per entity: BS",
+      "paper": "0.400 ms",
+      "measured": "9.891 ms (measured, incl. keygen)",
+      "status": "FAIL",
+      "reason": "measured C code on this PC; one secp256r1 scalar multiplication alone takes ~0.8-1 ms"
+    },
+    {
+      "claim": "UWS energy per authentication",
+      "paper": "48.8 uJ",
+      "measured": "177.6 uJ (6 ECC mult, 4 hash, 2 enc, 1 dec; flat model 177.6 uJ)",
+      "status": "FAIL",
+      "reason": "paper's per-operation energies, ECC charged per 256 scalar bits (K has 256 bits in this mode); PEECC needs 2 ECC multiplications per encrypted block and 1 per decryption, the paper counts 1 ECC and charges encryption at the AES rate"
+    },
+    {
+      "claim": "Mobile re-authentication (M1-M3)",
+      "paper": "< 1 ms",
+      "measured": "10.005 ms computation, 1.894 s incl. acoustic links",
+      "status": "FAIL",
+      "reason": "computation measured; the paper's figure ignores propagation and transmission"
+    },
+    {
+      "claim": "Registry storage of a UWS (< 10 peers)",
+      "paper": "< 250 B",
+      "measured": "40 B (20 B per RID)",
+      "status": "PASS",
+      "reason": ""
+    },
+    {
+      "claim": "Attacks detected (paper-exact)",
+      "paper": "all",
+      "measured": "7 of 11",
+      "status": "FAIL",
+      "reason": "delay injection (held 12.8 s, TS wraps); impersonate SUB to UWS (wrong key); impersonate UWS to SUB (inject M1+M3); K-public eavesdropping (M1-M12)"
+    },
+    {
+      "claim": "Attacks detected (hardened)",
+      "paper": "all",
+      "measured": "9 of 11",
+      "status": "FAIL",
+      "reason": "delay injection (held 12.8 s, TS wraps); impersonate UWS to SUB (inject M1+M3)"
+    },
+    {
+      "claim": "Scyther: all claims verified (Fig. 6)",
+      "paper": "all Ok",
+      "measured": "23 Ok, 35 Fail",
+      "status": "FAIL",
+      "reason": "responder-side claims fail: M1/M4/M7/M10 contain nothing only the initiator can produce"
+    },
+    {
+      "claim": "Delay grows linearly with depth",
+      "paper": "linear",
+      "measured": "fan-out 3: 4.22 s/level, R^2 = 0.991",
+      "status": "PASS",
+      "reason": "constant fan-out 3, depth 2-5 (4-121 nodes). With a fixed 100 nodes the trend reverses (-14.98 s/level, R^2 = 0.701): shallow trees put many children on one parent's modem"
+    },
+    {
+      "claim": "5-D curve overhead 1.3x of 2-D",
+      "paper": "1.3x",
+      "measured": "not measured",
+      "status": "N.A.",
+      "reason": "implementation is 2-D ([18]); no 5-D arithmetic exists"
+    }
+  ]
+}

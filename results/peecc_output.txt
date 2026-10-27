@@ -1,0 +1,76 @@
+==================================================================================================
+$ ./peecc.exe "hello world"        (2026-10-27 11:58)
+==================================================================================================
+mode: paper-exact [18] (x = Bx, K is public)
+
+== Key generation (receiver) [18] Sec. 3.1 ==
+  private key d          62eb6b0a2638e00ae8caef1ba95dd84fd6b484bf6d2d3f132756385454057881
+  public key Pub = d*B
+      x = d313eb9994a3d9d61796d13fce372e1b6bd6a74c44fd9bdce1415b073b453988
+      y = e6e5ff56a42826efd192907d5ebe33a6baa9d17aab9f825cd3b8801c51fea160
+  Pub on curve: yes
+
+== Encryption [18] Sec. 3.2 ==
+  message: "hello world" (11 bytes)
+  message point Pm (Koblitz)
+      x = 168656c6c6f20776f726c6401
+      y = c505b137900c2545991634f2d642fae5a72f5558c75fc4004b5cc91d3519f10b
+  x = Bx (public)        6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296
+  S = Pentatope(x)       53a0e0a9de034f682e2c4fa21cea25263c18feb0597c04d177e7cba520675d87875bbc01586193105976f28771d0672a371476cf24d848c5266a90ad2baac40438fe0a97aa3e96548b260608d67a48f91463588d0ccb6b46c27983b4485c402066c4812dd9cc5af5b946bdbf88aa5c04d9c8a41f5fe83769628aadcead674a
+  K = S^2+S+41           (2029 bits)
+  C1 = K*B
+      x = 681dc23639d030c4df03de37d6459fc1c8bde47e06c619c2c40d16c043c19f4f
+      y = d348cdd1aa9d0a7fbe331510280c5f04533c24950479bbd1a033b7f24be8608a
+  C2 = Pm + K*Pub
+      x = 897aac298746c2c917809b49fa22a3021f34046c628ba42aa90a7c7e9c661ea9
+      y = c97ef9be605e0ee44717ce2c53b36d5d9ed1043867a20928817dfeb93baf9c76
+
+== Decryption [18] Sec. 3.3 ==
+  Pm' = C2 - d*C1
+      x = 168656c6c6f20776f726c6401
+      y = c505b137900c2545991634f2d642fae5a72f5558c75fc4004b5cc91d3519f10b
+  decoded message: "hello world"
+  result: MATCH
+
+== Keyless eavesdropper: C2 - K_paper*Pub, no private key ==
+  eavesdropper reads: hello world
+  attack: SUCCEEDS (message not confidential)
+
+==================================================================================================
+$ ./peecc.exe --hardened "hello world"        (2026-10-27 11:58)
+==================================================================================================
+mode: HARDENED (deviation from [18]: random pentatope input x per message, K mod N, point validation)
+
+== Key generation (receiver) [18] Sec. 3.1 ==
+  private key d          b7cbc2de0f454d8caec1883763752220d47f4b2116b1338296fa7597eed3414c
+  public key Pub = d*B
+      x = 50dfce7582c7952679d7374158b7c58d0c3bf590858e82fe721665b5d7a46cac
+      y = 2e870900feae35df4a05c74ac615316fc9ecef887fe589445c14da59a7e1982e
+  Pub on curve: yes
+
+== Encryption [18] Sec. 3.2 ==
+  message: "hello world" (11 bytes)
+  message point Pm (Koblitz)
+      x = 168656c6c6f20776f726c6401
+      y = c505b137900c2545991634f2d642fae5a72f5558c75fc4004b5cc91d3519f10b
+  x = random (secret)    756d97a7e8a629e7d7b6a1eef88f69f47f5841c6d44077b56e7cf3bc25d89d79
+  S = Pentatope(x)       78e44deded62df9eceaf903714469ed5619b08f465505c9fa9e718b721654315c993f48479a56d9775899d9e78f0184ed46ac84e992828a5e89a1b613bd2aeeb7bb80e7f074259eec05621a193eaff0e538165452831cda596bcad9adc2b8a5513bc42be2e204876d1f54c5303c1b1e695296104692317de52fb18fe9eed43
+  K = (S^2+S+41) mod N   (255 bits)
+  C1 = K*B
+      x = 65e546817bef7023060829debf57294c2f0ff76363390cbdc962b904a1e27b3d
+      y = bec1c92a04ac075b4f2a62e004cc3d75c4492b14379b6ce8cfa410f5f857da19
+  C2 = Pm + K*Pub
+      x = 387358e81ae148c96d4a0d997ac47b8499a4fea306154e17734b57cebaf2430
+      y = 6c01c1bda13d71c1fc82459c08cc7c4439ac6724cb9cfe5aed2a2fa7f95efa71
+
+== Decryption [18] Sec. 3.3 ==
+  Pm' = C2 - d*C1
+      x = 168656c6c6f20776f726c6401
+      y = c505b137900c2545991634f2d642fae5a72f5558c75fc4004b5cc91d3519f10b
+  decoded message: "hello world"
+  result: MATCH
+
+== Keyless eavesdropper: C2 - K_paper*Pub, no private key ==
+  eavesdropper reads: (garbage, decoding fails)
+  attack: FAILS
+
