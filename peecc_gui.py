@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
-"""peecc_gui.py - presentation-style visual simulation of PEECC (reference [18]) and of an improved variant.
+"""peecc_gui.py - presentation-style visual simulation of PEECC (reference [18]) and of our improved scheme.
+
+It mirrors the dual-mode C program peecc.c (`--original` / `--improved`).
 
 Tab 1  Pipeline        : the full process on secp256r1 with real 256-bit values (animated block diagram).
-Tab 2  Toy curve       : the same algorithm on y^2 = x^3 + x + 1 (mod 23); every point and every k*B is visible.
-Tab 3  Improvements    : live, measured comparison "base paper [18] as specified" vs "improved scheme".
+Tab 2  Math walkthrough: the same algorithm on y^2 = x^3 + x + 1 (mod 23), every number written out.
+Tab 3  Toy curve       : every point and every k*B is visible.
+Tab 4  Improvements    : live, measured comparison "original [18]" vs "improved".
+Tab 5  Metrics         : computation / communication / security metrics.
 
-Modes
-  paper-exact  : K = S^2 + S + 41 from the public generator, exactly as in [18] (this is what peecc.c implements)
-  improved     : DEVIATION from [18]: fresh random r instead of K, and points are validated before use.
+Modes (same as peecc.c)
+  original : K = S^2 + S + 41 from the public generator, exactly as in [18]; C1 = K*B, C2 = Pm + K*Pub
+  improved : DEVIATION from [18]: fresh random r in [1, N-1] per message instead of K; C1 = r*B, C2 = Pm + r*Pub
+Both modes (as in peecc.c) validate the public key, the message point, C1 and C2 before using them;
+decryption is Pm = C2 - d*C1 in both.
 
-The mathematics is a pure-Python re-implementation of peecc.c.  `python peecc_gui.py --selftest` checks it against
-the values printed by peecc.exe (C1 and P_m of "hello world").  Needs tkinter + matplotlib.
+The mathematics is a pure-Python re-implementation of peecc.c.  `python peecc_gui.py --selftest` checks it
+(round trips, eavesdropper outcome in both modes, validation, curve constants).  Needs tkinter + matplotlib.
 """
 import secrets
 import sys
@@ -28,7 +34,7 @@ class Curve:
         return P is None or (P[1] * P[1] - (P[0] ** 3 + self.a * P[0] + self.b)) % self.p == 0
 
     def valid(self, P):
-        """Point validation: coordinates in range and on the curve (the C code does NOT do this)."""
+        """Point validation: finite point, coordinates in range and on the curve (done by peecc.c in both modes)."""
         return P is not None and 0 <= P[0] < self.p and 0 <= P[1] < self.p and self.on(P)
 
     def neg(self, P):
@@ -67,6 +73,12 @@ REAL = Curve(
     (0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296,
      0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5),
     0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551)
+
+
+def random_scalar(E):
+    """Same as random_scalar() in peecc.c: 48 random bytes (384 bit, negligible bias) reduced to [1, N-1].
+    Used for the private key d and, in the improved scheme, for the one-time number r."""
+    return int.from_bytes(secrets.token_bytes(48), "big") % (E.N - 1) + 1
 
 
 def pentatope(x):
@@ -114,22 +126,24 @@ def fmt_pt(P, n=14):
 
 
 def scheme_scalar(E, improved):
-    """The multiplier used for C1 = k*B and T = k*Pub.  paper-exact: public K; improved: fresh random r."""
+    """The multiplier used for C1 = k*B and T = k*Pub.  original: public K; improved: fresh random r."""
     if improved:
-        return secrets.randbelow(E.N - 1) + 1
+        return random_scalar(E)
     return euler_K(pentatope(E.B[0]))
 
 
 def encrypt_point(E, Pm, Pub, improved):
-    """Returns (k, C1, T, C2)."""
+    """Returns (k, C1, T, C2).  Like peecc.c, rejects an invalid public key or message point (both modes)."""
+    if not (E.valid(Pub) and E.valid(Pm)):
+        raise ValueError("invalid public key or message point")
     k = scheme_scalar(E, improved)
     C1, T = E.mul(k, E.B), E.mul(k, Pub)
     return k, C1, T, E.add(Pm, T)
 
 
-def decrypt_point(E, C1, C2, d, improved):
-    """Receiver side.  The improved scheme rejects invalid points first (returns None)."""
-    if improved and not (E.valid(C1) and E.valid(C2)):
+def decrypt_point(E, C1, C2, d, improved=None):
+    """Receiver side.  Like peecc.c, both modes reject invalid / off-curve points first (returns None)."""
+    if not (E.valid(C1) and E.valid(C2)):
         return None
     return E.add(C2, E.neg(E.mul(d, C1)))
 
@@ -144,7 +158,7 @@ def eve_attack(E, C2, Pub):
 def build_real_trace(msg, improved=False):
     E = REAL
     t = {"msg": msg, "improved": improved}
-    t["d"] = secrets.randbelow(E.N - 1) + 1
+    t["d"] = random_scalar(E)
     t["Pub"] = E.mul(t["d"], E.B)
     t["m"], t["tries"], t["Pm"], t["j"] = koblitz_encode(E, msg)
     t["S"] = pentatope(E.B[0])
@@ -188,7 +202,8 @@ def real_steps(t):
          ("look inside x", "0x%x   <- your bytes are readable here" % t["Pm"][0])])
     if imp:
         add("Improved: fresh random r (not K)", ["pent"], ("params", "pent", "r"),
-            "IMPROVEMENT (deviation from [18]): instead of a number anybody can compute, Alice draws a new secret random r for every message.",
+            "IMPROVEMENT (deviation from [18]): instead of a number anybody can compute, Alice draws a new secret random r for every message "
+            "(48 bytes from the operating system's secure random source, reduced to [1, N-1], exactly like random_scalar() in peecc.c).",
             "r in [1, N-1] random   (256 bit)   replaces K = S^2 + S + 41",
             [("r (secret, one-time)", short(t["K"])),
              ("size", "%d bit  (paper's K: %d bit)" % (t["K"].bit_length(), t["K_paper"].bit_length()))])
@@ -206,24 +221,20 @@ def real_steps(t):
         [("C1", fmt_pt(t["C1"])),
          ("scalar size", "%d bit -> ~%d point operations" % (t["K"].bit_length(), t["K"].bit_length() + bin(t["K"]).count("1")))])
     add("Second ciphertext point  C2 = Pm + k * Pub", ["kob", "enc"], ("kob", "enc", "Pm"),
-        "Alice masks her message point by adding k*Pub (a point only someone who knows k or d can remove).",
+        "Alice first checks that Pub and P_m are valid curve points (as peecc.c does), then masks her message point by adding k*Pub "
+        "(a point only someone who knows k or d can remove).",
         "T = k * Pub;     C2 = P_m + T",
         [("T = k*Pub", fmt_pt(t["T"])), ("C2", fmt_pt(t["C2"]))])
     add("Only (C1, C2) travels", ["enc", "chan"], ("enc", "chan", "(C1,C2)"),
         "Two points, 4 x 256 bit = 1024 bit = 128 bytes, go over the open channel. Anybody can record them.",
         "ciphertext = (C1, C2)", [("size", "128 bytes for an 11-byte message")])
-    if imp:
-        add("Bob validates and decrypts", ["chan", "dec", "keygen"], ("chan", "dec", "(C1,C2)"),
-            "IMPROVEMENT: Bob first checks both points really lie on the curve (rejects forged/off-curve input), then computes C2 - d*C1.",
-            "check C1, C2 on curve;   P_m' = C2 - d * C1",
-            [("C1, C2 valid?", str(t["valid"])), ("d*C1", fmt_pt(t["dC1"])), ("equals T?", str(t["dC1"] == t["T"])),
-             ("P_m'", fmt_pt(t["Pm2"]))])
-    else:
-        add("Bob decrypts", ["chan", "dec", "keygen"], ("chan", "dec", "(C1,C2)"),
-            "Bob uses his secret d: d*C1 = d*k*B = k*(d*B) = k*Pub, which is exactly the mask Alice added, so subtracting it gives P_m back.",
-            "P_m' = C2 - d * C1",
-            [("d*C1", fmt_pt(t["dC1"])), ("equals T = k*Pub?", str(t["dC1"] == t["T"])), ("P_m'", fmt_pt(t["Pm2"])),
-             ("P_m' == P_m ?", str(t["Pm2"] == t["Pm"]))])
+    add("Bob validates and decrypts", ["chan", "dec", "keygen"], ("chan", "dec", "(C1,C2)"),
+        "Bob first checks that C1 is not the point at infinity and that both points really lie on the curve (peecc.c rejects "
+        "forged / off-curve input in both modes). Then, with his secret d: d*C1 = d*k*B = k*(d*B) = k*Pub, exactly the mask Alice "
+        "added, so subtracting it gives P_m back.",
+        "check C1, C2 on curve;   P_m' = C2 - d * C1",
+        [("C1, C2 valid?", str(t["valid"])), ("d*C1", fmt_pt(t["dC1"])), ("equals T = k*Pub?", str(t["dC1"] == t["T"])),
+         ("P_m'", fmt_pt(t["Pm2"])), ("P_m' == P_m ?", str(t["Pm2"] == t["Pm"]))])
     add("Bob turns the point back into text", ["dec", "dko"], ("dec", "dko", "P_m'"),
         "Reverse of Koblitz: m = floor(x / 256); remove the leading 0x01.",
         "m = floor(x / 256)",
@@ -235,7 +246,8 @@ def real_steps(t):
         ("good" if ok else "bad", "MATCH - correct decryption" if ok else "MISMATCH"))
     ev = t["eve"] == msg
     add("Attacker Eve - without Bob's key", ["chan", "eve", "pent"], ("chan", "eve", "(C1,C2)"),
-        "Eve copies (C1, C2) from the channel. She knows Pub and, in the paper's scheme, also K. So she subtracts K*Pub herself.",
+        "Eve copies (C1, C2) from the channel. She knows Pub and, in the paper's scheme, also K. So she subtracts K*Pub herself "
+        "(this is the attack() function of peecc.c).",
         "P_m = C2 - K * Pub     (K computed from B_x, no secret used)",
         [("Eve's K*Pub", fmt_pt(t["eveT"])),
          ("Eve reads", ('"%s"' % t["eve"].decode("utf-8", "replace")) if ev else "garbage - decoding fails")],
@@ -317,7 +329,8 @@ def build_toy_frames(E, pts, d, m, improved, r, kappa=2):
                   marks={"B": B, "Pub": Pub, "Pm": Pm}, chain=[], arrows=[]))
     if improved:
         F.append(dict(title="Improved: one-time random r",
-                      plain="Instead of the public K, Alice uses a fresh random r (here r = %d). A different r next time gives a different ciphertext." % k,
+                      plain="Instead of the public K, Alice uses a fresh random r (here r = %d, chosen by you; peecc.c draws it from the OS "
+                            "random source). A different r next time gives a different ciphertext." % k,
                       math="r = %d   (the paper's K mod N would be %d)" % (k, Kp % N),
                       marks={"B": B, "Pub": Pub, "Pm": Pm}, chain=[], arrows=[]))
     else:
@@ -351,7 +364,7 @@ def build_toy_frames(E, pts, d, m, improved, r, kappa=2):
 # ============================================================================= benchmark (live, Python implementation)
 def bench_trial(E, improved, rng_bytes):
     """One trial: encrypt a random message, time it, and let the keyless Eve try."""
-    d = secrets.randbelow(E.N - 1) + 1
+    d = random_scalar(E)
     Pub = E.mul(d, E.B)
     _, _, Pm, _ = koblitz_encode(E, rng_bytes)
     t0 = time.perf_counter()
@@ -379,7 +392,7 @@ def metrics_trial(E, improved, msg):
     def delta(a, b):
         return tuple(y - x for x, y in zip(a, b))
 
-    d = secrets.randbelow(E.N - 1) + 1
+    d = random_scalar(E)
     s0, t0 = snap(), time.perf_counter()
     Pub = E.mul(d, E.B)
     t_key, c_key = (time.perf_counter() - t0) * 1000, delta(s0, snap())
@@ -397,7 +410,7 @@ def metrics_trial(E, improved, msg):
 
 
 def metrics_table(E, res):
-    """Rows: (metric, unit, paper-exact, improved, how obtained)."""
+    """Rows: (metric, unit, original, improved, how obtained)."""
     n = len(res[False])
 
     def ms(key, m):
@@ -458,9 +471,24 @@ def selftest():
     t = build_real_trace(b"hello world")
     assert t["C1"][0] == 0x681dc23639d030c4df03de37d6459fc1c8bde47e06c619c2c40d16c043c19f4f, "C1 matches peecc.exe"
     assert t["Pm"][0] == 0x168656c6c6f20776f726c6401, "Pm matches peecc.exe"
-    ti = build_real_trace(b"hello world", True)
-    bad = (ti["C1"][0], (ti["C1"][1] + 1) % E.p)
-    assert decrypt_point(E, bad, ti["C2"], ti["d"], True) is None, "off-curve point rejected"
+    # validation, as in peecc.c: BOTH modes reject off-curve ciphertext points and invalid encryption inputs
+    for imp in (False, True):
+        ti = build_real_trace(b"hello world", imp)
+        bad = (ti["C1"][0], (ti["C1"][1] + 1) % E.p)
+        assert decrypt_point(E, bad, ti["C2"], ti["d"], imp) is None, "off-curve point rejected (decrypt)"
+        assert decrypt_point(E, None, ti["C2"], ti["d"], imp) is None, "infinity C1 rejected"
+        for badpub in (None, (ti["Pub"][0], (ti["Pub"][1] + 1) % E.p)):
+            try:
+                encrypt_point(E, ti["Pm"], badpub, imp); raise AssertionError("invalid public key accepted")
+            except ValueError:
+                pass
+        try:
+            encrypt_point(E, (ti["Pm"][0], (ti["Pm"][1] + 1) % E.p), ti["Pub"], imp); raise AssertionError("invalid Pm accepted")
+        except ValueError:
+            pass
+    # random scalar: range and distinctness (same construction as peecc.c random_scalar)
+    rs = [random_scalar(E) for _ in range(300)]
+    assert all(1 <= r < E.N for r in rs) and len(set(rs)) == 300, "random scalar range / distinct"
     r1, r2 = bench_trial(E, True, b"abc"), bench_trial(E, False, b"abc")
     assert r1["ok"] and r2["ok"] and r2["eve"] and not r1["eve"] and not r1["same"] and r2["same"]
     assert r1["scalar_bits"] <= 256 and r2["scalar_bits"] == 2029
@@ -488,8 +516,8 @@ def selftest():
         for m in msgs:
             for d in range(1, T.N):
                 assert len(build_toy_frames(T, pts, d, m, imp, 5)) == 8
-    print("selftest OK: matches peecc.exe, round trips, eavesdropper (paper-exact breaks / improved blocks), validation, toy frames")
-
+    print("selftest OK: matches peecc.c (--original / --improved), round trips, eavesdropper (original breaks / improved blocks), "
+          "validation in both modes, random scalar, toy frames")
 
 
 # ============================================================================= math walkthrough (toy curve, every number shown)
@@ -630,7 +658,7 @@ def build_math_steps(E, d, m, improved, r, kappa=2):
     Pm2, tl2 = trace_add(E, C2, negT, "C2", "(-d*C1)")
     step("Decryption", "Bob", ["C1, C2", "d (secret)"], "P_m = C2 - d*C1", ["P_m"],
          "Bob multiplies C1 by his secret d. Because d*(k*B) = k*(d*B) = k*Pub, he gets exactly the mask T that Alice added, "
-         "and subtracting it returns P_m. Bob never needs k.",
+         "and subtracting it returns P_m. Bob never needs k. (peecc.c also checks that C1 and C2 lie on the curve first.)",
          ["d*C1 = d*k*B = k*Pub = T", "P_m = C2 - d*C1"],
          ["d*C1:"] + tl1 + ["d*C1 equals T = %s : %s" % (fmt(T), dC1 == T), "", "negate: -d*C1 = (x, -y) = %s" % fmt(negT), "then add:"] + tl2,
          {"C1": C1, "dC1": dC1, "C2": C2, "Pm'": Pm2}, arrows=[(C2, Pm2)])
@@ -700,7 +728,7 @@ NODES = {   # id: (cx, cy, title, body, fill)
     "kob": (295, 78, "Koblitz encode", "m -> point Pm", C["lblue"]),
     "enc": (745, 78, "PEECC encrypt", "C1 = k*B\nC2 = Pm + k*Pub", C["lgreen"]),
     "params": (295, 160, "Public parameters", "p, a, b, B, N", C["grey"]),
-    "pent": (520, 160, "Key number k", "paper: K = S^2+S+41\nimproved: random r", C["lblue"]),
+    "pent": (520, 160, "Key number k", "original: K = S^2+S+41\nimproved: random r", C["lblue"]),
     "chan": (745, 262, "Open channel", "(C1, C2) visible to all", C["lred"]),
     "eve": (520, 262, "Eve (attacker)", "knows B, Pub, C1, C2", C["lorange"]),
     "keygen": (945, 392, "Bob's keys", "d secret, Pub = d*B", C["lorange"]),
@@ -751,7 +779,7 @@ def run_gui():
     hdr = tk.Frame(root, bg=C["navy"]); hdr.pack(fill="x")
     tk.Label(hdr, text="PEECC  -  Pentatope Elliptic Curve Cryptography", bg=C["navy"], fg="white",
              font=("Segoe UI", 18, "bold")).pack(side="left", padx=18, pady=10)
-    tk.Label(hdr, text="Base paper [18]  |  secp256r1  |  C implementation: peecc.c", bg=C["navy"], fg="#9FB3C8",
+    tk.Label(hdr, text="Base paper [18]  |  secp256r1  |  C implementation: peecc.c (--original / --improved)", bg=C["navy"], fg="#9FB3C8",
              font=("Segoe UI", 10)).pack(side="left", padx=6)
     badge = tk.Label(hdr, text="", font=("Segoe UI", 11, "bold"), fg="white", padx=14, pady=4)
     badge.pack(side="right", padx=18)
@@ -773,7 +801,7 @@ def run_gui():
         if imp:
             badge.config(text="IMPROVED  (random r)", bg=C["green"])
         else:
-            badge.config(text="PAPER-EXACT  (K public)", bg=C["red"])
+            badge.config(text="ORIGINAL  (fixed K)", bg=C["red"])
 
     # =============================================================== TAB 1
     tab1 = ttk.Frame(nb); nb.add(tab1, text="1  Pipeline (real 256-bit values)")
@@ -782,9 +810,9 @@ def run_gui():
     ttk.Label(bar, text="Message (max 29 bytes):").pack(side="left")
     msg_var = tk.StringVar(value="hello world")
     ttk.Entry(bar, textvariable=msg_var, width=26, font=("Segoe UI", 11)).pack(side="left", padx=6)
-    ttk.Radiobutton(bar, text="Paper-exact [18]", variable=improved_var, value=False,
+    ttk.Radiobutton(bar, text="Original [18] (fixed K)", variable=improved_var, value=False,
                     command=lambda: run()).pack(side="left", padx=(14, 2))
-    ttk.Radiobutton(bar, text="Improved (deviation)", variable=improved_var, value=True,
+    ttk.Radiobutton(bar, text="Improved (random r)", variable=improved_var, value=True,
                     command=lambda: run()).pack(side="left", padx=2)
     speed = tk.DoubleVar(value=2.2)
     ttk.Label(bar, text="Delay (s):").pack(side="left", padx=(14, 2))
@@ -813,7 +841,7 @@ def run_gui():
     vals.tag_configure("good", foreground=C["green"], font=("Segoe UI", 11, "bold"))
     vals.tag_configure("bad", foreground=C["red"], font=("Segoe UI", 11, "bold"))
 
-    hist_box = ttk.LabelFrame(left, text=" C1 across runs: paper-exact = always identical, improved = always new ")
+    hist_box = ttk.LabelFrame(left, text=" C1 across runs: original = always identical, improved = always new ")
     hist_box.pack(fill="x", pady=6)
     tree = ttk.Treeview(hist_box, columns=("n", "mode", "c1", "c2", "eve"), show="headings", height=3)
     for c, w, nm in (("n", 34, "#"), ("mode", 100, "mode"), ("c1", 170, "C1.x"), ("c2", 170, "C2.x"), ("eve", 330, "keyless Eve reads the message?")):
@@ -938,7 +966,7 @@ def run_gui():
         S1["steps"] = real_steps(t)
         S1["hist"] += 1
         broke = t["eve"] == data
-        tree.insert("", 0, values=(S1["hist"], "improved" if t["improved"] else "paper-exact", short(t["C1"][0], 8), short(t["C2"][0], 8),
+        tree.insert("", 0, values=(S1["hist"], "improved" if t["improved"] else "original", short(t["C1"][0], 8), short(t["C2"][0], 8),
                                    ("YES - read \"%s\"" % t["eve"].decode("utf-8", "replace")) if broke else "no - attack fails"),
                     tags=("bad" if broke else "good",))
         show_step(0)
@@ -997,7 +1025,7 @@ def run_gui():
     ttk.Label(row, text="Alice's message number m:").pack(side="left")
     cb = ttk.Combobox(row, values=msgs2, textvariable=m_var, width=4, state="readonly"); cb.pack(side="left", padx=4)
     cb.bind("<<ComboboxSelected>>", lambda e: rebuild2())
-    ttk.Radiobutton(ctrl, text="Paper-exact (public K)", variable=mode2, value=False, command=lambda: rebuild2()).pack(anchor="w", padx=8, pady=(8, 0))
+    ttk.Radiobutton(ctrl, text="Original (public K)", variable=mode2, value=False, command=lambda: rebuild2()).pack(anchor="w", padx=8, pady=(8, 0))
     ttk.Radiobutton(ctrl, text="Improved (one-time random r)", variable=mode2, value=True, command=lambda: rebuild2()).pack(anchor="w", padx=8)
     row = ttk.Frame(ctrl); row.pack(fill="x", padx=8, pady=2)
     ttk.Label(row, text="   r =").pack(side="left")
@@ -1105,11 +1133,12 @@ def run_gui():
     tab3 = ttk.Frame(nb); nb.add(tab3, text="4  Improvements vs base paper")
     top3 = tk.Frame(tab3, bg=C["white"], highlightbackground="#C9D2DA", highlightthickness=1)
     top3.pack(fill="x", padx=10, pady=(8, 4))
-    tk.Label(top3, text="What we change relative to the base paper [18]   (deviations: the paper's own scheme is the left column)",
+    tk.Label(top3, text="What we change relative to the base paper [18]   (the original scheme is the left column)",
              bg=C["white"], fg=C["navy"], font=("Segoe UI", 12, "bold")).pack(anchor="w", padx=12, pady=(8, 2))
     for txt_ in ("1.  Fresh random one-time number r instead of K = S^2+S+41   ->  K is computable by anybody from the public generator, r is not.",
-                 "2.  Validate C1 and C2 (on curve, in range) before using them   ->  the C code never checks (finding F4).",
+                 "2.  Same message twice gives different ciphertexts, and C1 differs every time   ->  ciphertexts are unlinkable (original: always identical).",
                  "3.  Multiplier is 256 bit (r) instead of 2029 bit (K)   ->  about 8x fewer point operations per encryption.",
+                 "Hardening shared by BOTH modes of peecc.c (not in [18]): Pub, Pm, C1 and C2 are validated (finite, on curve) before use; Koblitz mapping is specified.",
                  "Not fixed by either scheme: no authentication / integrity tag, not constant-time, 29-byte blocks."):
         tk.Label(top3, text=txt_, bg=C["white"], fg="#333" if not txt_.startswith("Not") else C["red"], font=("Segoe UI", 10),
                  anchor="w", justify="left").pack(anchor="w", padx=18)
@@ -1127,18 +1156,18 @@ def run_gui():
     mid3 = ttk.Frame(tab3); mid3.pack(fill="both", expand=True, padx=10, pady=4)
     leftm = ttk.Frame(mid3); leftm.pack(side="left", fill="both", expand=True)
     tq = ttk.Treeview(leftm, columns=("m", "a", "b", "c"), show="headings", height=8)
-    for c, w, nm in (("m", 270, "Quantitative metric (measured live)"), ("a", 150, "Base paper [18]"), ("b", 150, "Improved"), ("c", 150, "Change")):
+    for c, w, nm in (("m", 270, "Quantitative metric (measured live)"), ("a", 150, "Original [18]"), ("b", 150, "Improved"), ("c", 150, "Change")):
         tq.heading(c, text=nm); tq.column(c, width=w, anchor="w")
     tq.tag_configure("good", foreground=C["green"]); tq.pack(fill="x")
     tql = ttk.Treeview(leftm, columns=("p", "a", "b", "e"), show="headings", height=8)
-    for c, w, nm in (("p", 250, "Qualitative property"), ("a", 110, "Base paper [18]"), ("b", 110, "Improved"), ("e", 270, "Evidence")):
+    for c, w, nm in (("p", 250, "Qualitative property"), ("a", 110, "Original [18]"), ("b", 110, "Improved"), ("e", 270, "Evidence")):
         tql.heading(c, text=nm); tql.column(c, width=w, anchor="w")
     tql.tag_configure("yes", foreground=C["green"]); tql.tag_configure("no", foreground=C["red"]); tql.tag_configure("same", foreground=C["dgrey"])
     for p_, a_, b_, e_, tg in (
             ("Confidential against a passive eavesdropper", "NO", "YES", "live: keyless Eve success rate", "yes"),
             ("Same message twice -> different ciphertext", "NO", "YES", "live metric above", "yes"),
             ("Ciphertexts unlinkable (C1 differs)", "NO", "YES", "live: distinct C1 count", "yes"),
-            ("Rejects off-curve / forged points", "NO", "YES", "peecc.c has no check (F4); selftest", "yes"),
+            ("Rejects off-curve / forged points", "YES", "YES", "both modes of peecc.c validate; selftest", "same"),
             ("Follows the paper's key derivation exactly", "YES", "NO", "improved drops the pentatope K on purpose", "no"),
             ("Message authentication / integrity", "NO", "NO", "neither scheme has a tag - future work", "same"),
             ("Constant-time / side-channel safe", "NO", "NO", "neither (educational code)", "same"),
@@ -1157,7 +1186,7 @@ def run_gui():
         res = B3["res"]
         if not res[False]:
             canvas3.draw_idle(); return
-        names, cols = ["Base paper\n[18]", "Improved"], [C["red"], C["green"]]
+        names, cols = ["Original\n[18]", "Improved"], [C["red"], C["green"]]
         eve = [100.0 * sum(r["eve"] for r in res[m]) / len(res[m]) for m in (False, True)]
         ms = [sum(r["ms"] for r in res[m]) / len(res[m]) for m in (False, True)]
         dist = [len({r["c1"] for r in res[m]}) for m in (False, True)]
@@ -1239,7 +1268,7 @@ def run_gui():
     cols4 = ("m", "u", "a", "b", "s")
     st.configure("Compact.Treeview", font=("Segoe UI", 9), rowheight=21)
     tm = ttk.Treeview(tab4, columns=cols4, show="headings", height=16, style="Compact.Treeview")
-    for c, w, nm in (("m", 420, "Metric"), ("u", 70, "Unit"), ("a", 170, "Base paper [18]"), ("b", 170, "Improved"), ("s", 150, "How obtained")):
+    for c, w, nm in (("m", 420, "Metric"), ("u", 70, "Unit"), ("a", 170, "Original [18]"), ("b", 170, "Improved"), ("s", 150, "How obtained")):
         tm.heading(c, text=nm); tm.column(c, width=w, anchor="w" if c in ("m", "s") else "center")
     tm.tag_configure("diff", foreground=C["green"])
     tm.pack(fill="x", padx=10, pady=4)
@@ -1286,7 +1315,7 @@ def run_gui():
     ttk.Label(bar5, text="Message number m:").pack(side="left")
     cb5 = ttk.Combobox(bar5, values=validM, textvariable=m5, width=4, state="readonly"); cb5.pack(side="left", padx=(4, 12))
     cb5.bind("<<ComboboxSelected>>", lambda e: rebuild5())
-    ttk.Radiobutton(bar5, text="Paper-exact [18]", variable=mode5, value=False, command=lambda: rebuild5()).pack(side="left")
+    ttk.Radiobutton(bar5, text="Original [18]", variable=mode5, value=False, command=lambda: rebuild5()).pack(side="left")
     ttk.Radiobutton(bar5, text="Improved:  r =", variable=mode5, value=True, command=lambda: rebuild5()).pack(side="left", padx=(8, 0))
     ttk.Spinbox(bar5, from_=1, to=EM.N - 1, textvariable=r5, width=4, command=lambda: rebuild5()).pack(side="left", padx=4)
     play5 = ttk.Button(bar5, text="Play", style="Accent.TButton", command=lambda: toggle5()); play5.pack(side="right", padx=2)
